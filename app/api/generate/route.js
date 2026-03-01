@@ -49,6 +49,10 @@ async function genererMetadonnees(script) {
 }
 
 async function creerVideoHeygen(script, avatarId, voiceId, heygenKey) {
+  // HeyGen limite le texte à 5000 caractères par segment
+  // Si le script est long, on l'envoie en un seul bloc (truncated si nécessaire)
+  const scriptFinal = script.substring(0, 4900)
+
   const res = await fetch('https://api.heygen.com/v2/video/generate', {
     method: 'POST',
     headers: {
@@ -64,36 +68,53 @@ async function creerVideoHeygen(script, avatarId, voiceId, heygenKey) {
         },
         voice: {
           type: 'text',
-          input_text: script.substring(0, 1500),
-          voice_id: voiceId
+          input_text: scriptFinal,
+          voice_id: voiceId,
+          speed: 1.0,
+        },
+        background: {
+          type: 'color',
+          value: '#FAFAFA'
         }
       }],
-      dimension: { width: 1280, height: 720 }
+      dimension: { width: 1280, height: 720 },
+      aspect_ratio: null,
     })
   })
+
   const data = await res.json()
-  if (data?.data?.video_id) return data.data.video_id
-  throw new Error(`Heygen erreur: ${JSON.stringify(data)}`)
+
+  // Log pour debug en cas d'erreur
+  if (!data?.data?.video_id) {
+    console.error('HeyGen response:', JSON.stringify(data))
+    throw new Error(`Heygen erreur: ${data?.message || data?.error || JSON.stringify(data)}`)
+  }
+
+  return data.data.video_id
 }
 
-async function attendreVideoHeygen(videoId, heygenKey, maxTentatives = 40) {
+async function attendreVideoHeygen(videoId, heygenKey, maxTentatives = 60) {
   for (let i = 0; i < maxTentatives; i++) {
-    await new Promise(r => setTimeout(r, 15000)) // 15s
+    await new Promise(r => setTimeout(r, 15000)) // attend 15s entre chaque check
+
     const res = await fetch(`https://api.heygen.com/v1/video_status.get?video_id=${videoId}`, {
       headers: { 'X-Api-Key': heygenKey }
     })
     const data = await res.json()
     const status = data?.data?.status
 
+    console.log(`HeyGen status [${i + 1}/${maxTentatives}]: ${status}`)
+
     if (status === 'completed') return data.data.video_url
-    if (status === 'failed') throw new Error(`Heygen failed: ${JSON.stringify(data.data.error)}`)
-    // sinon on continue à attendre
+    if (status === 'failed') {
+      throw new Error(`Heygen failed: ${JSON.stringify(data.data.error || data.data)}`)
+    }
+    // pending / processing → on continue
   }
-  throw new Error('Timeout: la vidéo Heygen prend trop longtemps')
+  throw new Error('Timeout: la vidéo HeyGen prend trop longtemps (>15 min)')
 }
 
 async function uploaderSurYoutube({ videoUrl, titre, description, channelData, datePublication }) {
-  // Récupère les tokens de la chaîne
   const oauth2Client = new google.auth.OAuth2(
     process.env.YOUTUBE_CLIENT_ID,
     process.env.YOUTUBE_CLIENT_SECRET,
@@ -105,7 +126,7 @@ async function uploaderSurYoutube({ videoUrl, titre, description, channelData, d
     refresh_token: channelData.refresh_token,
   })
 
-  // Télécharge la vidéo Heygen en mémoire
+  // Télécharge la vidéo HeyGen en mémoire
   const videoRes = await fetch(videoUrl)
   const videoBuffer = await videoRes.arrayBuffer()
   const videoStream = Buffer.from(videoBuffer)
@@ -152,6 +173,7 @@ export async function POST(request) {
       description: descriptionManuelle,
       chaineId,
       datePublication,
+      scriptDirect, // ← NOUVEAU : true si le client colle son propre script final
     } = body
 
     if (!userId || !contenu || !avatarId || !voiceId || !heygenKey || !chaineId) {
@@ -170,7 +192,7 @@ export async function POST(request) {
       return Response.json({ error: 'Chaîne introuvable' }, { status: 404 })
     }
 
-    // Crée l'entrée vidéo en base avec statut "en_attente"
+    // Crée l'entrée vidéo en base
     const { data: video, error: videoError } = await supabase
       .from('videos')
       .insert({
@@ -178,7 +200,8 @@ export async function POST(request) {
         channel_id: chaineData.channel_id,
         script: contenu,
         duree: parseInt(duree),
-        statut: 'generation_script',
+        // Si script direct → on saute l'étape IA, on va direct à HeyGen
+        statut: scriptDirect ? 'generation_video' : 'generation_script',
         date_publication: datePublication || null,
       })
       .select()
@@ -190,10 +213,11 @@ export async function POST(request) {
 
     const videoDbId = video.id
 
-    // Lance le pipeline en arrière-plan (on répond immédiatement)
+    // Lance le pipeline en arrière-plan
     runPipeline({
       videoDbId, userId, contenu, duree, avatarId, voiceId, heygenKey,
-      titreManuel, descriptionManuelle, chaineData, datePublication
+      titreManuel, descriptionManuelle, chaineData, datePublication,
+      scriptDirect: !!scriptDirect, // ← passé au pipeline
     }).catch(async (err) => {
       console.error('Pipeline error:', err)
       await supabase.from('videos').update({ statut: 'erreur' }).eq('id', videoDbId)
@@ -207,17 +231,32 @@ export async function POST(request) {
   }
 }
 
-async function runPipeline({ videoDbId, userId, contenu, duree, avatarId, voiceId, heygenKey, titreManuel, descriptionManuelle, chaineData, datePublication }) {
+// ── Pipeline complet ───────────────────────────────────────
 
+async function runPipeline({
+  videoDbId, userId, contenu, duree,
+  avatarId, voiceId, heygenKey,
+  titreManuel, descriptionManuelle,
+  chaineData, datePublication,
+  scriptDirect,
+}) {
   const update = (statut, extra = {}) =>
     supabase.from('videos').update({ statut, ...extra }).eq('id', videoDbId)
 
-  // ÉTAPE 1 — Génère le script avec l'IA
-  await update('generation_script')
-  const script = await genererScriptIA(contenu, duree)
-  await update('script_pret', { script })
+  let script
 
-  // ÉTAPE 2 — Génère titre + description si non fournis
+  if (scriptDirect) {
+    // ✅ Le client a fourni son script directement → on l'utilise tel quel
+    script = contenu
+    await update('script_pret', { script })
+  } else {
+    // 🤖 On génère le script avec l'IA depuis le contenu/idée
+    await update('generation_script')
+    script = await genererScriptIA(contenu, duree)
+    await update('script_pret', { script })
+  }
+
+  // Génère titre + description si non fournis
   let titre = titreManuel
   let description = descriptionManuelle
   if (!titre || !description) {
@@ -228,20 +267,22 @@ async function runPipeline({ videoDbId, userId, contenu, duree, avatarId, voiceI
   }
   await update('meta_pret', { titre, description })
 
-  // ÉTAPE 3 — Envoie à Heygen
+  // Envoie à HeyGen
   await update('generation_video')
   const heygenVideoId = await creerVideoHeygen(script, avatarId, voiceId, heygenKey)
   await update('video_en_cours', { heygen_video_id: heygenVideoId })
 
-  // ÉTAPE 4 — Attend la fin de génération Heygen
+  // Attend la fin de génération HeyGen (polling)
   const videoUrl = await attendreVideoHeygen(heygenVideoId, heygenKey)
   await update('upload_youtube', { thumbnail_url: videoUrl })
 
-  // ÉTAPE 5 — Upload sur YouTube
+  // Upload sur YouTube
   const youtubeVideoId = await uploaderSurYoutube({
     videoUrl, titre, description, channelData: chaineData, datePublication
   })
 
-  // ÉTAPE 6 — Terminé !
-  await update('publiee', { youtube_video_id: youtubeVideoId })
+  // Terminé !
+  await update(datePublication ? 'programmee' : 'publiee', {
+    youtube_video_id: youtubeVideoId
+  })
 }
