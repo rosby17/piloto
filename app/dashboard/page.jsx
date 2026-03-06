@@ -26,6 +26,7 @@ const Icon = {
   mic: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 7a5 5 0 0010 0M7 12v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
   close: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
   download: <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+  lock: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="2" y="5" width="8" height="6" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M4 5V3.5a2 2 0 014 0V5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>,
 }
 
 // ── Statut config ──────────────────────────────────────────
@@ -35,8 +36,8 @@ const STATUTS = {
   script_pret:       { label: 'Script prêt',        color: 'text-violet-400',  bg: 'bg-violet-400/8 border-violet-400/15', pulse: false },
   generation_meta:   { label: 'Métadonnées IA',     color: 'text-blue-400',    bg: 'bg-blue-400/8 border-blue-400/15',     pulse: true  },
   meta_pret:         { label: 'Métadonnées prêtes', color: 'text-blue-400',    bg: 'bg-blue-400/8 border-blue-400/15',     pulse: false },
-  generation_video:  { label: 'Envoi Heygen',       color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
-  video_en_cours:    { label: 'Heygen en cours',    color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
+  generation_video:  { label: 'Envoi HeyGen',       color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
+  video_en_cours:    { label: 'Piloto génère...',   color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
   upload_youtube:    { label: 'Upload YouTube',     color: 'text-orange-400',  bg: 'bg-orange-400/8 border-orange-400/15', pulse: true  },
   publiee:           { label: 'Publiée',            color: 'text-emerald-400', bg: 'bg-emerald-400/8 border-emerald-400/15', pulse: false },
   programmee:        { label: 'Programmée',         color: 'text-sky-400',     bg: 'bg-sky-400/8 border-sky-400/15',       pulse: false },
@@ -44,6 +45,27 @@ const STATUTS = {
 }
 
 const inputCls = "w-full bg-[#111] border border-[#222] rounded-lg px-3.5 py-2.5 text-[13px] text-white placeholder-[#333] focus:outline-none focus:border-[#c0392b] transition"
+
+// ── Temps écoulé ───────────────────────────────────────────
+function timeAgo(dateStr) {
+  const now = new Date()
+  const date = new Date(dateStr)
+  const diffMs = now - date
+  const diffSec = Math.floor(diffMs / 1000)
+  const diffMin = Math.floor(diffSec / 60)
+  const diffH   = Math.floor(diffMin / 60)
+  const diffD   = Math.floor(diffH / 24)
+
+  if (diffSec < 60)  return "à l'instant"
+  if (diffMin < 60)  return `il y a ${diffMin} min`
+  if (diffH < 24)    return `il y a ${diffH}h`
+  if (diffD === 1)   return 'hier'
+  if (diffD < 7)     return `il y a ${diffD}j`
+  return new Date(dateStr).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
+}
+
+// ── Statuts considérés "en cours de génération" ────────────
+const STATUTS_EN_COURS = ['generation_script', 'generation_meta', 'generation_video', 'video_en_cours', 'en_attente']
 
 // ── Composants réutilisables ───────────────────────────────
 function PageHeader({ title, sub, action }) {
@@ -242,10 +264,12 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
   const [renamingVideo, setRenamingVideo] = useState(null)
   const [renameValue, setRenameValue] = useState('')
-  // ── état pour le lecteur vidéo modal ──
-  const [playingVideo, setPlayingVideo] = useState(null) // { url, titre }
+  const [playingVideo, setPlayingVideo] = useState(null)
+  // ── Ticker pour forcer re-render du temps écoulé chaque minute ──
+  const [tick, setTick] = useState(0)
   const intervalRef = useRef(null)
   const pollingRef = useRef({})
+  const tickRef = useRef(null)
 
   const fetchVideos = async () => {
     const { data } = await supabase
@@ -301,14 +325,16 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   useEffect(() => {
     fetchVideos()
     intervalRef.current = setInterval(fetchVideos, 10000)
+    // Ticker pour rafraîchir le temps écoulé toutes les 30s
+    tickRef.current = setInterval(() => setTick(t => t + 1), 30000)
     return () => {
       clearInterval(intervalRef.current)
+      clearInterval(tickRef.current)
       Object.values(pollingRef.current).forEach(clearInterval)
       pollingRef.current = {}
     }
   }, [])
 
-  // Fermer menu si clic en dehors
   useEffect(() => {
     const handle = () => setOpenMenuId(null)
     document.addEventListener('click', handle)
@@ -331,6 +357,9 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   }
 
   const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret', 'upload_youtube'].includes(v.statut))
+
+  // ── Vérifie si une vidéo est en cours de génération (non éditable) ──
+  const isEnCours = (v) => STATUTS_EN_COURS.includes(v.statut)
 
   const getStatusOverlay = (statut) => {
     switch (statut) {
@@ -357,7 +386,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
         }
       case 'generation_video':
         return {
-          label: 'Envoi HeyGen...',
+          label: 'Envoi en cours...',
           icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M8 5v3l2 2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
           bg: 'bg-amber-500/20 border-amber-500/30',
           dot: 'bg-amber-400',
@@ -367,7 +396,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
         }
       case 'video_en_cours':
         return {
-          label: 'HeyGen génère...',
+          label: 'Piloto génère...', // ← MODIFIÉ
           icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M8 5v3l2 2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
           bg: 'bg-amber-500/20 border-amber-500/30',
           dot: 'bg-amber-400',
@@ -407,7 +436,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const getStatusLabel = (statut) => {
     const map = {
       en_attente: 'En attente', generation_script: 'Script IA', script_pret: 'Draft',
-      generation_video: 'Envoi...', video_en_cours: 'HeyGen', upload_youtube: 'Prête ✓',
+      generation_video: 'Envoi...', video_en_cours: 'Piloto', upload_youtube: 'Prête ✓', // ← MODIFIÉ
       publiee: 'Publiée', programmee: 'Programmée', erreur: 'Erreur',
     }
     return map[statut] || statut
@@ -489,7 +518,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
             <div
               className="relative w-full max-w-4xl mx-4"
               onClick={e => e.stopPropagation()}>
-              {/* Header modal */}
               <div className="flex items-center justify-between mb-3 px-1">
                 <p className="text-[13px] font-medium text-white truncate pr-4">{playingVideo.titre || 'Vidéo'}</p>
                 <button
@@ -498,7 +526,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                   {Icon.close}
                 </button>
               </div>
-              {/* Lecteur vidéo */}
               <video
                 src={playingVideo.url}
                 controls
@@ -506,7 +533,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                 className="w-full rounded-xl border border-[#2a2a2a] bg-black shadow-2xl"
                 style={{ maxHeight: '72vh' }}
               />
-              {/* Footer avec bouton télécharger */}
               <div className="flex items-center justify-between mt-3 px-1">
                 <p className="text-[11px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>
                   Appuie sur Échap ou clique en dehors pour fermer
@@ -587,6 +613,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
         {openMenuId && (() => {
           const v = videos.find(vid => vid.id === openMenuId)
           if (!v) return null
+          const enCours = isEnCours(v)
           return (
             <>
               <div className="fixed inset-0 z-[998]" onClick={() => setOpenMenuId(null)} />
@@ -597,20 +624,30 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                 <div className="px-3.5 py-2 border-b border-[#1e1e1e] mb-1">
                   <p className="text-[10px] text-[#555] truncate" style={{ fontFamily: "'DM Mono', monospace" }}>{v.titre || 'Vidéo'}</p>
                 </div>
-                <button
-                  onClick={() => {
-                    setOpenMenuId(null)
-                    sessionStorage.setItem('piloto_studio_video_id', v.id)
-                    sessionStorage.setItem('piloto_studio_script', v.script || v.contenu || '')
-                    sessionStorage.setItem('piloto_studio_title', v.titre || '')
-                    sessionStorage.setItem('piloto_studio_avatar_id', v.avatar_id || '')
-                    sessionStorage.setItem('piloto_studio_voice_id', v.voice_id || '')
-                    router.push('/dashboard/studio')
-                  }}
-                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#c0392b] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left font-medium">
-                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
-                  Éditer dans Studio
-                </button>
+
+                {/* ── Éditer dans Studio — désactivé si en cours ── */}
+                {enCours ? (
+                  <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
+                    {Icon.lock}
+                    <span>Génération en cours...</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setOpenMenuId(null)
+                      sessionStorage.setItem('piloto_studio_video_id', v.id)
+                      sessionStorage.setItem('piloto_studio_script', v.script || v.contenu || '')
+                      sessionStorage.setItem('piloto_studio_title', v.titre || '')
+                      sessionStorage.setItem('piloto_studio_avatar_id', v.avatar_id || '')
+                      sessionStorage.setItem('piloto_studio_voice_id', v.voice_id || '')
+                      router.push('/dashboard/studio')
+                    }}
+                    className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#c0392b] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left font-medium">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                    Éditer dans Studio
+                  </button>
+                )}
+
                 <div className="border-t border-[#1e1e1e] my-1" />
                 {v.thumbnail_url ? (
                   <button onClick={() => { setPlayingVideo({ url: v.thumbnail_url, titre: v.titre }); setOpenMenuId(null) }}
@@ -627,11 +664,11 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                 {v.thumbnail_url ? (
                   <a href={v.thumbnail_url} download onClick={() => setOpenMenuId(null)}
                     className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> Télécharger
+                    {Icon.download} Télécharger
                   </a>
                 ) : (
                   <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
-                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> Télécharger (en cours...)
+                    {Icon.download} Télécharger (en cours...)
                   </div>
                 )}
                 {v.youtube_video_id ? (
@@ -689,6 +726,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
               const isDraft = v.statut === 'script_pret'
               const isReady = v.statut === 'upload_youtube'
               const isMenuOpen = openMenuId === v.id
+              const enCours = isEnCours(v)
 
               return (
                 <div key={v.id} className="group relative flex flex-col rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40">
@@ -696,12 +734,10 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                   {/* Vignette 16/9 */}
                   <div className="relative rounded-t-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
 
-                    {/* ── VIDÉO PRÊTE : miniature + bouton play par-dessus ── */}
                     {isReady && v.thumbnail_url ? (
                       <button
                         onClick={() => setPlayingVideo({ url: v.thumbnail_url, titre: v.titre })}
                         className="block w-full h-full group/play relative">
-                        {/* Miniature vidéo */}
                         <video
                           src={v.thumbnail_url}
                           className="w-full h-full object-cover"
@@ -709,7 +745,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                           preload="metadata"
                           onMouseEnter={e => { e.currentTarget.currentTime = 1 }}
                         />
-                        {/* Overlay sombre + bouton play centré */}
                         <div className="absolute inset-0 bg-black/30 group-hover/play:bg-black/50 transition-all duration-200 flex items-center justify-center">
                           <div className="w-11 h-11 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm flex items-center justify-center group-hover/play:scale-110 group-hover/play:bg-white/20 transition-all duration-200 shadow-lg">
                             <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
@@ -717,7 +752,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                             </svg>
                           </div>
                         </div>
-                        {/* Badge "Prête" en bas à gauche */}
                         <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm border border-emerald-500/30 px-2 py-1 rounded-lg">
                           <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
                           <span className="text-[10px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Prête</span>
@@ -752,20 +786,30 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Bouton crayon → Piloto Studio */}
+                    {/* Bouton crayon — désactivé si en cours */}
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
-                      <button
-                        onClick={e => {
-                          e.stopPropagation()
-                          sessionStorage.setItem('piloto_studio_video_id', v.id)
-                          sessionStorage.setItem('piloto_studio_script', v.script || '')
-                          sessionStorage.setItem('piloto_studio_title', v.titre || '')
-                          router.push('/dashboard/studio')
-                        }}
-                        className="w-7 h-7 rounded-lg bg-black/70 backdrop-blur-sm border border-white/10 flex items-center justify-center text-[#ccc] hover:text-white transition"
-                        title="Éditer dans Piloto Studio">
-                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
-                      </button>
+                      {enCours ? (
+                        <div
+                          className="w-7 h-7 rounded-lg bg-black/70 backdrop-blur-sm border border-white/10 flex items-center justify-center text-[#444] cursor-not-allowed"
+                          title="Génération en cours — édition impossible">
+                          {Icon.lock}
+                        </div>
+                      ) : (
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            sessionStorage.setItem('piloto_studio_video_id', v.id)
+                            sessionStorage.setItem('piloto_studio_script', v.script || v.contenu || '')
+                            sessionStorage.setItem('piloto_studio_title', v.titre || '')
+                            sessionStorage.setItem('piloto_studio_avatar_id', v.avatar_id || '')
+                            sessionStorage.setItem('piloto_studio_voice_id', v.voice_id || '')
+                            router.push('/dashboard/studio')
+                          }}
+                          className="w-7 h-7 rounded-lg bg-black/70 backdrop-blur-sm border border-white/10 flex items-center justify-center text-[#ccc] hover:text-white transition"
+                          title="Éditer dans Piloto Studio">
+                          <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                        </button>
+                      )}
                     </div>
                   </div>
 
@@ -775,8 +819,9 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       {v.titre || <span className="text-[#2a2a2a] italic font-normal">Titre en génération...</span>}
                     </p>
                     <div className="flex items-center justify-between mt-auto pt-1">
+                      {/* ── TEMPS ÉCOULÉ au lieu de la date ── */}
                       <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
-                        {new Date(v.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                        {timeAgo(v.created_at)}
                       </span>
 
                       <div className="flex items-center gap-1.5">
@@ -830,6 +875,7 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
   const [tone, setTone]       = useState('')
   const [audience, setAudience] = useState('')
   const [longueur, setLongueur] = useState('medium')
+  const [titre, setTitre] = useState('')
 
   const [heygenKey, setHeygenKey]   = useState('')
   const [avatarId, setAvatarId]     = useState('')
@@ -843,9 +889,32 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
   const [selectedAvatarObj, setSelectedAvatarObj] = useState(null)
   const [selectedVoiceObj, setSelectedVoiceObj]   = useState(null)
 
-  const [titre, setTitre]         = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading]     = useState(false)
+
+  // ── Sauvegarde draft au retour ────────────────────────────
+  const savingDraftRef = useRef(false)
+
+  const handleBack = async () => {
+    // Si un script a été saisi/généré sans lancer la génération → sauvegarder en draft
+    const scriptToSave = contenu || scriptGenere || scriptBrut
+    if (scriptToSave.trim() && !savingDraftRef.current) {
+      savingDraftRef.current = true
+      try {
+        const { data: { user: u } } = await supabase.auth.getUser()
+        if (u) {
+          await supabase.from('videos').insert({
+            user_id: u.id,
+            titre: titre || 'Brouillon sans titre',
+            script: scriptToSave,
+            contenu: scriptToSave,
+            statut: 'script_pret', // = draft
+          })
+        }
+      } catch (e) { console.error('Erreur sauvegarde draft:', e) }
+    }
+    onBack()
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -981,6 +1050,7 @@ ${scriptBrut}`
   }
 
   const lancerGeneration = async () => {
+    savingDraftRef.current = true // marquer pour ne pas re-sauvegarder en draft
     setLoading(true)
     try {
       const { data: { user: u } } = await supabase.auth.getUser()
@@ -1009,6 +1079,8 @@ ${scriptBrut}`
   const tones     = ['Authoritative & Medical','Storytelling & Emotional','Energetic & Motivational','Friendly & Conversational','Educational & Scientific']
   const audiences = ['Seniors 60+','Adults 40-60','Young Adults 18-35','General Audience','Content Creators','Entrepreneurs']
 
+  const hasScript = !!(contenu || scriptGenere || scriptBrut).trim()
+
   return (
     <div>
       <PageHeader
@@ -1021,8 +1093,9 @@ ${scriptBrut}`
           etape === 'avatar' ? 'Choisis ton avatar' : 'Prêt à générer'
         }
         action={
-          <button onClick={onBack} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition border border-[#1e1e1e] hover:border-[#333] px-3.5 py-2 rounded-lg">
-            {Icon.arrowLeft} Retour
+          <button onClick={handleBack} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition border border-[#1e1e1e] hover:border-[#333] px-3.5 py-2 rounded-lg">
+            {Icon.arrowLeft}
+            {hasScript ? 'Retour (sauvegarde draft)' : 'Retour'}
           </button>
         }
       />
@@ -1150,7 +1223,7 @@ ${scriptBrut}`
             </div>
 
             <div>
-              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Ton</p>
+              <p className="text-[11px] text-[#444] tracking-widests uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Ton</p>
               <div className="grid grid-cols-2 gap-2">
                 {tones.map(t => (
                   <button key={t} onClick={() => setTone(t)}
