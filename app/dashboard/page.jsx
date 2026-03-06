@@ -938,7 +938,6 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
             user_id: u.id,
             titre: titre || 'Brouillon sans titre',
             script: scriptToSave,
-            contenu: scriptToSave,
             statut: 'script_pret', // = draft
           })
         }

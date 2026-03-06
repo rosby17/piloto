@@ -131,7 +131,7 @@ function StudioContent() {
           .single()
         if (vid) {
           // Priorité : champs Supabase > sessionStorage > défauts
-          finalScript   = vid.script || vid.contenu || finalScript
+          finalScript   = vid.script || finalScript
           finalTitle    = vid.titre  || finalTitle
           finalAvatarId = vid.avatar_id || finalAvatarId
           finalVoiceId  = vid.voice_id  || finalVoiceId
@@ -191,7 +191,6 @@ function StudioContent() {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: user.id,
-          contenu: script,
           avatarId: selectedAvatar.avatar_id,
           voiceId: selectedVoice.voice_id,
           heygenKey,
@@ -265,7 +264,6 @@ function StudioContent() {
         // ── Mise à jour d'une vidéo existante ──
         const { error } = await supabase.from('videos').update({
           script:    scriptVal,
-          contenu:   scriptVal,
           titre:     titleVal || 'Brouillon',
           avatar_id: avatarVal?.avatar_id || null,
           voice_id:  voiceVal?.voice_id   || null,
@@ -277,7 +275,6 @@ function StudioContent() {
         const { data: rows, error } = await supabase.from('videos').insert({
           user_id:   uid,
           script:    scriptVal,
-          contenu:   scriptVal,
           titre:     titleVal || 'Brouillon Piloto Studio',
           avatar_id: avatarVal?.avatar_id || null,
           voice_id:  voiceVal?.voice_id   || null,
