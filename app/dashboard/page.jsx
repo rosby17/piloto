@@ -686,14 +686,14 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
 
         {/* ── ÉTAPE SCRIPT ── */}
         {etape === 'script' && (
-          <div className="space-y-6">
+          <div className="space-y-4">
             <Field label="Colle ton script">
               <textarea
                 value={contenu}
                 onChange={e => setContenu(e.target.value)}
                 className={`${inputCls} resize-none`}
-                rows={10}
-                placeholder="Colle ici ton script complet...&#10;&#10;L'IA va analyser le contenu, générer un titre et une description optimisés pour YouTube."
+                rows={12}
+                placeholder="Colle ici ton script complet..."
               />
               {contenu && (
                 <p className="text-[11px] text-[#333] mt-1.5" style={{ fontFamily: "'DM Mono', monospace" }}>
@@ -702,25 +702,22 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
               )}
             </Field>
 
-            <Field label="Durée de la vidéo">
-              <div className="grid grid-cols-3 gap-2">
-                {[
-                  { v:'60',  l:'Court',  s:'~1 min' },
-                  { v:'180', l:'Moyen',  s:'~3 min' },
-                  { v:'600', l:'Long',   s:'~10 min' },
-                ].map(d => (
-                  <button key={d.v} onClick={() => setDuree(d.v)}
-                    className={`py-3 rounded-lg border text-left px-3.5 transition-all ${duree === d.v ? 'bg-[#c0392b]/10 border-[#c0392b]' : 'bg-[#111] border-[#1e1e1e] hover:border-[#2a2a2a]'}`}>
-                    <div className={`text-[12px] font-semibold ${duree === d.v ? 'text-white' : 'text-[#555]'}`}>{d.l}</div>
-                    <div className="text-[11px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>{d.s}</div>
-                  </button>
-                ))}
+            <button
+              onClick={() => setEtape('avatar')}
+              disabled={!contenu.trim()}
+              className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-all group"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                  {Icon.spark}
+                </div>
+                <div className="text-left">
+                  <p className="text-[13px] font-semibold text-white">Analyser le script</p>
+                  <p className="text-[11px] text-white/60">Titre · Description · Avatar</p>
+                </div>
               </div>
-            </Field>
-
-            <Btn onClick={() => setEtape('avatar')} disabled={!contenu.trim()} className="w-full justify-center">
-              Continuer — choisir l'avatar {Icon.arrow}
-            </Btn>
+              <span className="text-white/70 group-hover:translate-x-0.5 transition-transform">{Icon.arrow}</span>
+            </button>
           </div>
         )}
 
