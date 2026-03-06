@@ -785,11 +785,26 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 
 // ── NOUVELLE VIDÉO ─────────────────────────────────────────
 // Flux simplifié : Script → Avatar → Publication (pas d'étapes visibles)
+// ── NOUVELLE VIDÉO ─────────────────────────────────────────
 function NouvelleVideo({ user, onBack, onGoToParams }) {
-  const [etape, setEtape] = useState('script') // 'script' | 'avatar' | 'publication'
-  const [contenu, setContenu] = useState('')
-  const [duree, setDuree] = useState('60')
+  // étapes: 'choix' | 'analyse' | 'suggestions' | 'script_pret' | 'avatar' | 'confirmation'
+  const [etape, setEtape] = useState('choix')
 
+  // Script flow
+  const [scriptBrut, setScriptBrut] = useState('')        // script collé par l'user
+  const [analysing, setAnalysing]   = useState(false)
+  const [suggestions, setSuggestions] = useState(null)     // { niche, tone, audience, titre_suggere, resume }
+  const [scriptGenere, setScriptGenere] = useState('')     // script final généré par IA
+  const [generatingScript, setGeneratingScript] = useState(false)
+  const [contenu, setContenu] = useState('')               // script final utilisé pour la vidéo
+
+  // Config IA
+  const [niche, setNiche]     = useState('')
+  const [tone, setTone]       = useState('')
+  const [audience, setAudience] = useState('')
+  const [longueur, setLongueur] = useState('medium')
+
+  // Heygen
   const [heygenKey, setHeygenKey]   = useState('')
   const [avatarId, setAvatarId]     = useState('')
   const [voiceId, setVoiceId]       = useState('')
@@ -802,13 +817,10 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
   const [selectedAvatarObj, setSelectedAvatarObj] = useState(null)
   const [selectedVoiceObj, setSelectedVoiceObj]   = useState(null)
 
-  const [titre, setTitre]               = useState('')
-  const [description, setDescription]   = useState('')
-  const [miniature, setMiniature]       = useState(null)
-  const [datePublication, setDatePublication] = useState('')
-  const [chaineSelectionnee, setChaineSelectionnee] = useState(null)
-  const [chaines, setChaines]           = useState([])
-  const [loading, setLoading]           = useState(false)
+  // Publication
+  const [titre, setTitre]         = useState('')
+  const [description, setDescription] = useState('')
+  const [loading, setLoading]     = useState(false)
 
   useEffect(() => {
     const init = async () => {
@@ -837,11 +849,107 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
         setVoiceId(profile.default_voice_id)
         setSelectedVoiceObj({ voice_id: profile.default_voice_id, name: profile.default_voice_name })
       }
-      const { data: ch } = await supabase.from('youtube_channels').select('*').order('created_at', { ascending: false })
-      if (ch) setChaines(ch)
     }
     init()
   }, [])
+
+  // ── Analyser le script avec l'IA ──────────────────────────
+  const analyserScript = async () => {
+    if (!scriptBrut.trim()) return
+    setAnalysing(true)
+    setEtape('analyse')
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 1000,
+          messages: [{
+            role: 'user',
+            content: `Analyse ce script YouTube et retourne UNIQUEMENT un JSON valide (sans markdown, sans backticks) avec ces champs:
+{
+  "niche": "Health & Wellness | Finance & Money | Personal Development | Nutrition & Diet | Mental Health | Fitness & Sport | Technology | Spirituality | Relationships | Business",
+  "tone": "Authoritative & Medical | Storytelling & Emotional | Energetic & Motivational | Friendly & Conversational | Educational & Scientific",
+  "audience": "Seniors 60+ | Adults 40-60 | Young Adults 18-35 | General Audience | Content Creators | Entrepreneurs",
+  "langue": "Français | English | Español | Português | Deutsch | Italiano | العربية | Nederlands | Русский | 中文",
+  "titre_suggere": "titre accrocheur YouTube optimisé SEO",
+  "resume": "résumé en 1 phrase du contenu"
+}
+
+Script à analyser:
+${scriptBrut.substring(0, 3000)}`
+          }]
+        })
+      })
+      const data = await response.json()
+      const text = data.content?.[0]?.text || '{}'
+      const clean = text.replace(/```json|```/g, '').trim()
+      const parsed = JSON.parse(clean)
+      setSuggestions(parsed)
+      setNiche(parsed.niche || '')
+      setTone(parsed.tone || '')
+      setAudience(parsed.audience || '')
+      setTitre(parsed.titre_suggere || '')
+      setEtape('suggestions')
+    } catch (err) {
+      console.error(err)
+      setSuggestions({})
+      setEtape('suggestions')
+    }
+    setAnalysing(false)
+  }
+
+  // ── Générer le script amélioré ──────────────────────────────
+  const genererScript = async () => {
+    setGeneratingScript(true)
+    setEtape('script_pret')
+    const longueurMap = {
+      short: '1000-5000 caractères (3-5 min)',
+      medium: '5000-15000 caractères (8-12 min)',
+      long: '15000-30000 caractères (15-20 min)',
+    }
+    try {
+      const response = await fetch('https://api.anthropic.com/v1/messages', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          model: 'claude-sonnet-4-20250514',
+          max_tokens: 4000,
+          messages: [{
+            role: 'user',
+            content: `Tu es un expert en scripts YouTube viraux. Réécris et améliore ce script en le rendant plus engageant et optimisé pour YouTube.
+
+Paramètres:
+- Niche: ${niche}
+- Ton: ${tone}
+- Audience cible: ${audience}
+- Longueur souhaitée: ${longueurMap[longueur]}
+- Langue: garde la même langue que le script original
+
+Instructions:
+- Commence par un hook fort qui accroche en 3 secondes
+- Structure claire: Hook → Problème → Solution → CTA
+- Adapte le vocabulaire à l'audience ${audience}
+- Ton ${tone}
+- NE retourne QUE le script pur, sans titre ni notes de mise en scène
+
+Script original:
+${scriptBrut}`
+          }]
+        })
+      })
+      const data = await response.json()
+      const script = data.content?.[0]?.text || scriptBrut
+      setScriptGenere(script)
+      setContenu(script)
+    } catch (err) {
+      console.error(err)
+      setScriptGenere(scriptBrut)
+      setContenu(scriptBrut)
+    }
+    setGeneratingScript(false)
+  }
 
   const lancerGeneration = async () => {
     setLoading(true)
@@ -850,21 +958,16 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
       const res = await fetch('/api/generate', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          userId: u.id, contenu, duree, avatarId, voiceId, heygenKey,
+          userId: u.id, contenu, avatarId, voiceId, heygenKey,
           titre, description,
           scriptDirect: true,
-          stopAfterVideo: true, // ← ne pas uploader sur YouTube automatiquement
+          stopAfterVideo: true,
         })
       })
       const data = await res.json()
-      if (data.success) {
-        onBack()
-      } else {
-        alert('Erreur : ' + data.error)
-      }
-    } catch (err) {
-      alert('Erreur : ' + err.message)
-    }
+      if (data.success) { onBack() }
+      else { alert('Erreur : ' + data.error) }
+    } catch (err) { alert('Erreur : ' + err.message) }
     setLoading(false)
   }
 
@@ -873,11 +976,15 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
     return v.language?.toLowerCase().includes(voiceFilter) || v.locale?.toLowerCase().includes(voiceFilter)
   })
 
+  const niches    = ['Health & Wellness','Finance & Money','Personal Development','Nutrition & Diet','Mental Health','Fitness & Sport','Technology','Spirituality','Relationships','Business']
+  const tones     = ['Authoritative & Medical','Storytelling & Emotional','Energetic & Motivational','Friendly & Conversational','Educational & Scientific']
+  const audiences = ['Seniors 60+','Adults 40-60','Young Adults 18-35','General Audience','Content Creators','Entrepreneurs']
+
   return (
     <div>
       <PageHeader
         title="Nouvelle vidéo"
-        sub="De ton script à YouTube, automatiquement."
+        sub={etape === 'choix' ? 'Tu as déjà un script ou tu veux en générer un ?' : etape === 'analyse' ? 'Analyse en cours...' : etape === 'suggestions' ? 'Confirme les suggestions IA' : etape === 'script_pret' ? 'Script optimisé prêt' : etape === 'avatar' ? 'Choisis ton avatar' : 'Prêt à générer'}
         action={
           <button onClick={onBack} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition border border-[#1e1e1e] hover:border-[#333] px-3.5 py-2 rounded-lg">
             {Icon.arrowLeft} Retour
@@ -885,22 +992,304 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
         }
       />
 
-      <div className="px-10 py-8 max-w-[640px]">
+      <div className="px-10 py-8 max-w-[680px]">
 
-        {/* ── ÉTAPE SCRIPT ── */}
-        {etape === 'script' && (
+        {/* ── ÉTAPE 0 : CHOIX ── */}
+        {etape === 'choix' && (
+          <div className="space-y-3">
+            {/* Option A — Générer avec IA */}
+            <button
+              onClick={() => setEtape('saisie')}
+              className="w-full flex items-center gap-4 px-5 py-5 bg-[#0d0d0d] border border-[#1e1e1e] hover:border-[#c0392b]/40 hover:bg-[#c0392b]/5 rounded-xl transition-all text-left group">
+              <div className="w-11 h-11 rounded-xl bg-[#c0392b]/10 border border-[#c0392b]/20 flex items-center justify-center flex-shrink-0 text-[#c0392b] group-hover:bg-[#c0392b]/20 transition">
+                {Icon.spark}
+              </div>
+              <div className="flex-1">
+                <p className="text-[14px] font-semibold text-white mb-0.5">Optimiser mon script avec l'IA</p>
+                <p className="text-[12px] text-[#555]">Colle ton script brut — l'IA l'analyse, suggère et génère une version virale</p>
+              </div>
+              <span className="text-[#333] group-hover:text-[#c0392b] group-hover:translate-x-0.5 transition-all">{Icon.arrow}</span>
+            </button>
+
+            {/* Option B — Script prêt → Piloto Studio direct */}
+            <button
+              onClick={() => setEtape('script_direct')}
+              className="w-full flex items-center gap-4 px-5 py-5 bg-[#0d0d0d] border border-[#1e1e1e] hover:border-[#2a2a2a] hover:bg-[#111] rounded-xl transition-all text-left group">
+              <div className="w-11 h-11 rounded-xl bg-[#1a1a1a] border border-[#222] flex items-center justify-center flex-shrink-0 text-[#555] group-hover:text-[#aaa] transition">
+                {Icon.file}
+              </div>
+              <div className="flex-1">
+                <p className="text-[14px] font-semibold text-white mb-0.5">J'ai déjà un script prêt</p>
+                <p className="text-[12px] text-[#555]">Passe directement à l'avatar et à la génération vidéo</p>
+              </div>
+              <span className="text-[#333] group-hover:text-[#555] group-hover:translate-x-0.5 transition-all">{Icon.arrow}</span>
+            </button>
+          </div>
+        )}
+
+        {/* ── ÉTAPE SAISIE (IA flow) ── */}
+        {etape === 'saisie' && (
           <div className="space-y-4">
-            <Field label="Colle ton script">
+            <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
+                <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="text-[#555]"><path d="M2 2.5h9M2 5.5h6M2 8.5h7M2 11.5h4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                <span className="text-[11px] text-[#555] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Coller un titre, un script ou un transcript</span>
+                <span className="text-[#c0392b] text-[11px]">*</span>
+              </div>
+              <textarea
+                value={scriptBrut}
+                onChange={e => setScriptBrut(e.target.value)}
+                className="w-full bg-[#0d0d0d] px-4 py-4 text-[13px] text-white placeholder-[#2a2a2a] focus:outline-none resize-none"
+                rows={10}
+                placeholder="Collez votre script complet ici..."
+              />
+              <div className="flex items-center justify-between px-4 py-2.5 border-t border-[#1a1a1a] bg-[#0a0a0a]">
+                <span className="text-[11px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>{scriptBrut.length} caractères</span>
+                <button
+                  onClick={analyserScript}
+                  disabled={!scriptBrut.trim()}
+                  className="flex items-center gap-2 text-[12px] font-medium px-4 py-2 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-lg transition">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6" cy="6" r="4.5" stroke="currentColor" strokeWidth="1.2"/><path d="M10 10l2 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+                  Analyser & Continuer
+                </button>
+              </div>
+            </div>
+
+            {/* Pipeline visuel */}
+            <div className="flex items-center justify-center gap-3 py-3">
+              {[
+                { icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3h10M2 6h7M2 9h8M2 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, label: 'Votre Script' },
+                { icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.2"/><path d="M9.5 4.5l-4 4M4.5 4.5l4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, label: 'Analyse IA' },
+                { icon: Icon.spark, label: 'Script Viral' },
+              ].map((step, i, arr) => (
+                <div key={step.label} className="flex items-center gap-3">
+                  <div className="flex flex-col items-center gap-1.5">
+                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${i === 0 ? 'bg-[#1e1e1e] text-[#888]' : i === 1 ? 'bg-amber-500/20 text-amber-400' : 'bg-[#c0392b]/20 text-[#c0392b]'}`}>
+                      {step.icon}
+                    </div>
+                    <span className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>{step.label}</span>
+                  </div>
+                  {i < arr.length - 1 && (
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#222] mb-4"><path d="M4 8h8M9 5l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  )}
+                </div>
+              ))}
+            </div>
+
+            <button onClick={() => setEtape('choix')} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition">
+              {Icon.arrowLeft} Retour
+            </button>
+          </div>
+        )}
+
+        {/* ── ÉTAPE ANALYSE (spinner) ── */}
+        {etape === 'analyse' && (
+          <div className="flex flex-col items-center gap-6 py-20">
+            <div className="relative">
+              <div className="w-16 h-16 rounded-2xl bg-[#c0392b]/10 border border-[#c0392b]/20 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-[#c0392b]/30 border-t-[#c0392b] rounded-full animate-spin" />
+              </div>
+            </div>
+            <div className="text-center">
+              <p className="text-[15px] font-medium text-white mb-1">Analyse en cours...</p>
+              <p className="text-[12px] text-[#444]">L'IA détecte la niche, le ton et l'audience</p>
+            </div>
+            <div className="flex items-center gap-2">
+              {['Niche', 'Ton', 'Audience', 'Titre'].map((item, i) => (
+                <div key={item} className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-[#111] border border-[#1e1e1e] text-[11px] text-[#444] animate-pulse" style={{ animationDelay: `${i * 0.2}s` }}>
+                  <span className="w-1 h-1 rounded-full bg-[#c0392b]/50" />
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ── ÉTAPE SUGGESTIONS ── */}
+        {etape === 'suggestions' && suggestions && (
+          <div className="space-y-5">
+            {/* Badge auto-detected */}
+            <div className="flex items-center gap-2 px-3.5 py-2.5 bg-[#c0392b]/8 border border-[#c0392b]/20 rounded-xl">
+              <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="text-[#c0392b] flex-shrink-0"><path d="M6.5 1L8 5H12L8.8 7.4 10 11.5 6.5 9.2 3 11.5l1.2-4.1L1 5h4L6.5 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+              <span className="text-[11px] text-[#c0392b] tracking-widest uppercase font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Auto-détecté — confirme ou ajuste</span>
+            </div>
+
+            {/* Titre suggéré */}
+            {suggestions.titre_suggere && (
+              <div className="border border-[#c0392b]/30 bg-[#c0392b]/5 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] text-[#c0392b] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Titre suggéré · {suggestions.langue}</span>
+                  <button onClick={() => setTitre(suggestions.titre_suggere)} className="text-[10px] text-[#c0392b] hover:text-white transition border border-[#c0392b]/30 hover:border-[#c0392b] px-2 py-1 rounded-lg">
+                    Utiliser
+                  </button>
+                </div>
+                <p className="text-[13px] font-semibold text-white leading-snug">{suggestions.titre_suggere}</p>
+              </div>
+            )}
+
+            {/* Niche */}
+            <div>
+              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Niche</p>
+              <div className="flex flex-wrap gap-2">
+                {niches.map(n => (
+                  <button key={n} onClick={() => setNiche(n)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] border transition ${niche === n ? 'border-[#c0392b] bg-[#c0392b]/10 text-white' : 'border-[#1e1e1e] text-[#555] hover:border-[#2a2a2a] hover:text-[#aaa]'}`}>
+                    {niche === n && <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5L3.5 6.5 7.5 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Ton */}
+            <div>
+              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Ton</p>
+              <div className="grid grid-cols-2 gap-2">
+                {tones.map(t => (
+                  <button key={t} onClick={() => setTone(t)}
+                    className={`flex items-center gap-2 px-3.5 py-2.5 rounded-xl border text-left text-[12px] transition ${tone === t ? 'border-[#c0392b] bg-[#c0392b]/10 text-white' : 'border-[#1a1a1a] bg-[#0a0a0a] text-[#555] hover:border-[#2a2a2a] hover:text-[#aaa]'}`}>
+                    {tone === t && <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="flex-shrink-0 text-[#c0392b]"><path d="M1.5 5L3.5 7 8.5 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                    {t}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Audience */}
+            <div>
+              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Audience cible</p>
+              <div className="flex flex-wrap gap-2">
+                {audiences.map(a => (
+                  <button key={a} onClick={() => setAudience(a)}
+                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[12px] border transition ${audience === a ? 'border-[#c0392b] bg-[#c0392b]/10 text-white' : 'border-[#1e1e1e] text-[#555] hover:border-[#2a2a2a] hover:text-[#aaa]'}`}>
+                    {audience === a && <svg width="9" height="9" viewBox="0 0 9 9" fill="none"><path d="M1.5 4.5L3.5 6.5 7.5 2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                    {a}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Longueur */}
+            <div>
+              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Longueur du script</p>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { key: 'short',  label: 'Court',  detail: '3-5 min',   chars: '1k-5k' },
+                  { key: 'medium', label: 'Medium', detail: '8-12 min',  chars: '5k-15k' },
+                  { key: 'long',   label: 'Long',   detail: '15-20 min', chars: '15k-30k' },
+                ].map(l => (
+                  <button key={l.key} onClick={() => setLongueur(l.key)}
+                    className={`flex flex-col items-start px-3.5 py-3 rounded-xl border text-left transition ${longueur === l.key ? 'border-[#c0392b] bg-[#c0392b]/8' : 'border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a]'}`}>
+                    <div className="flex items-center justify-between w-full mb-1">
+                      <span className={`text-[12px] font-semibold ${longueur === l.key ? 'text-white' : 'text-[#555]'}`}>{l.label}</span>
+                      <span className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>{l.detail}</span>
+                    </div>
+                    <span className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>{l.chars} chars</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <button
+              onClick={genererScript}
+              className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] rounded-xl transition-all group">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center">{Icon.spark}</div>
+                <div className="text-left">
+                  <p className="text-[13px] font-semibold text-white">Générer le script complet</p>
+                  <p className="text-[11px] text-white/60">Script viral optimisé · {longueur === 'short' ? '3-5 min' : longueur === 'medium' ? '8-12 min' : '15-20 min'}</p>
+                </div>
+              </div>
+              <span className="text-white/70 group-hover:translate-x-0.5 transition-transform">{Icon.arrow}</span>
+            </button>
+
+            <button onClick={() => setEtape('saisie')} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition">
+              {Icon.arrowLeft} Retour
+            </button>
+          </div>
+        )}
+
+        {/* ── ÉTAPE SCRIPT GÉNÉRÉ ── */}
+        {etape === 'script_pret' && (
+          <div className="space-y-4">
+            {generatingScript ? (
+              <div className="flex flex-col items-center gap-5 py-20">
+                <div className="w-14 h-14 rounded-2xl bg-[#c0392b]/10 border border-[#c0392b]/20 flex items-center justify-center">
+                  <div className="w-6 h-6 border-2 border-[#c0392b]/30 border-t-[#c0392b] rounded-full animate-spin" />
+                </div>
+                <div className="text-center">
+                  <p className="text-[14px] font-medium text-white mb-1">Génération du script viral...</p>
+                  <p className="text-[12px] text-[#444]">Hook · Structure · CTA optimisés</p>
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Header script ready */}
+                <div className="flex items-center justify-between px-4 py-3 bg-emerald-500/8 border border-emerald-500/20 rounded-xl">
+                  <div className="flex items-center gap-2.5">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-emerald-400"><path d="M2 7l4 4 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                    <span className="text-[12px] font-medium text-emerald-400">Script prêt</span>
+                    <span className="text-[11px] text-emerald-400/60" style={{ fontFamily: "'DM Mono', monospace" }}>
+                      {scriptGenere.split(' ').length} mots · ~{Math.ceil(scriptGenere.split(' ').length / 130)} min
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => navigator.clipboard.writeText(scriptGenere)}
+                    className="flex items-center gap-1.5 text-[11px] text-[#555] hover:text-white transition border border-[#222] hover:border-[#333] px-2.5 py-1 rounded-lg">
+                    <svg width="11" height="11" viewBox="0 0 11 11" fill="none"><rect x="1" y="3" width="7" height="7" rx="1" stroke="currentColor" strokeWidth="1.1"/><path d="M3 3V2a1 1 0 011-1h5a1 1 0 011 1v6a1 1 0 01-1 1H8" stroke="currentColor" strokeWidth="1.1" strokeLinecap="round"/></svg>
+                    Copier
+                  </button>
+                </div>
+
+                {/* Script content */}
+                <div className="relative border border-[#1a1a1a] rounded-xl overflow-hidden">
+                  <textarea
+                    value={scriptGenere}
+                    onChange={e => { setScriptGenere(e.target.value); setContenu(e.target.value) }}
+                    className="w-full bg-[#0a0a0a] px-4 py-4 text-[12px] text-[#aaa] leading-relaxed focus:outline-none resize-none"
+                    rows={14}
+                    style={{ fontFamily: "'DM Mono', monospace" }}
+                  />
+                </div>
+
+                {/* CTA principal — Aller dans Piloto Studio */}
+                <button
+                  onClick={() => { setContenu(scriptGenere); setEtape('avatar') }}
+                  className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] rounded-xl transition-all group">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                      <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="11" rx="1.5" stroke="white" strokeWidth="1.3"/><path d="M5.5 5.5l4 2-4 2V5.5Z" fill="white"/></svg>
+                    </div>
+                    <div className="text-left">
+                      <p className="text-[13px] font-semibold text-white">Aller dans Piloto Studio</p>
+                      <p className="text-[11px] text-white/60">Choisir l'avatar et générer la vidéo</p>
+                    </div>
+                  </div>
+                  <span className="text-white/70 group-hover:translate-x-0.5 transition-transform">{Icon.arrow}</span>
+                </button>
+
+                <button onClick={() => setEtape('suggestions')} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition">
+                  {Icon.arrowLeft} Ajuster les paramètres
+                </button>
+              </>
+            )}
+          </div>
+        )}
+
+        {/* ── ÉTAPE SCRIPT DIRECT (déjà un script) ── */}
+        {etape === 'script_direct' && (
+          <div className="space-y-4">
+            <Field label="Ton script final">
               <textarea
                 value={contenu}
                 onChange={e => setContenu(e.target.value)}
                 className={`${inputCls} resize-none`}
                 rows={12}
-                placeholder="Colle ici ton script complet..."
+                placeholder="Colle ici ton script prêt à tourner..."
               />
               {contenu && (
                 <p className="text-[11px] text-[#333] mt-1.5" style={{ fontFamily: "'DM Mono', monospace" }}>
-                  {contenu.length} caractères · ~{Math.ceil(contenu.split(' ').length / 130)} min de lecture
+                  {contenu.split(' ').length} mots · ~{Math.ceil(contenu.split(' ').length / 130)} min
                 </p>
               )}
             </Field>
@@ -908,18 +1297,21 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
             <button
               onClick={() => setEtape('avatar')}
               disabled={!contenu.trim()}
-              className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-all group"
-            >
+              className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-all group">
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                  {Icon.spark}
+                  <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><rect x="1" y="2" width="13" height="11" rx="1.5" stroke="white" strokeWidth="1.3"/><path d="M5.5 5.5l4 2-4 2V5.5Z" fill="white"/></svg>
                 </div>
                 <div className="text-left">
-                  <p className="text-[13px] font-semibold text-white">Analyser le script</p>
-                  <p className="text-[11px] text-white/60">Titre · Description · Avatar</p>
+                  <p className="text-[13px] font-semibold text-white">Aller dans Piloto Studio</p>
+                  <p className="text-[11px] text-white/60">Choisir l'avatar et générer la vidéo</p>
                 </div>
               </div>
               <span className="text-white/70 group-hover:translate-x-0.5 transition-transform">{Icon.arrow}</span>
+            </button>
+
+            <button onClick={() => setEtape('choix')} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition">
+              {Icon.arrowLeft} Retour
             </button>
           </div>
         )}
@@ -933,7 +1325,6 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
                 <span className="text-[13px] text-[#555]">Chargement de tes avatars HeyGen...</span>
               </div>
             )}
-
             {!avatars.length && !loadingAssets && (
               <div className="flex flex-col items-center gap-4 py-16 border border-dashed border-[#1e1e1e] rounded-2xl mb-5">
                 <div className="w-12 h-12 rounded-xl bg-[#111] border border-[#222] flex items-center justify-center text-[#333] text-2xl">🎭</div>
@@ -944,56 +1335,40 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
                 <Btn variant="subtle" onClick={onGoToParams}>{Icon.settings} Paramètres</Btn>
               </div>
             )}
-
             {assetsError && (
               <div className="px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-xl mb-5">
                 <p className="text-[12px] text-red-400">{assetsError}</p>
               </div>
             )}
-
             {avatars.length > 0 && (
               <div className="flex gap-5">
-                {/* Avatars */}
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-3">
-                    <p className="text-[11px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar</p>
-                  </div>
-                  <input type="text" value={avatarSearch} onChange={e => setAvatarSearch(e.target.value)}
-                    className={`${inputCls} mb-3 text-[12px]`} placeholder="Rechercher..." />
+                  <p className="text-[11px] text-[#444] tracking-widest uppercase mb-3" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar</p>
+                  <input type="text" value={avatarSearch} onChange={e => setAvatarSearch(e.target.value)} className={`${inputCls} mb-3 text-[12px]`} placeholder="Rechercher..." />
                   {avatars.filter(a => a.type === 'personal').length > 0 && (
                     <div className="mb-3">
                       <p className="text-[10px] text-[#c0392b] tracking-widest uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>✦ Mes avatars</p>
                       <div className="grid grid-cols-2 gap-2">
-                        {avatars.filter(a => a.type === 'personal' && (!avatarSearch || a.avatar_name?.toLowerCase().includes(avatarSearch.toLowerCase())))
-                          .map(avatar => (
-                            <AvatarCard key={avatar.avatar_id} avatar={avatar} selected={avatarId === avatar.avatar_id}
-                              onSelect={() => { setAvatarId(avatar.avatar_id); setSelectedAvatarObj(avatar) }} />
-                          ))}
+                        {avatars.filter(a => a.type === 'personal' && (!avatarSearch || a.avatar_name?.toLowerCase().includes(avatarSearch.toLowerCase()))).map(avatar => (
+                          <AvatarCard key={avatar.avatar_id} avatar={avatar} selected={avatarId === avatar.avatar_id} onSelect={() => { setAvatarId(avatar.avatar_id); setSelectedAvatarObj(avatar) }} />
+                        ))}
                       </div>
                     </div>
                   )}
                   <p className="text-[10px] text-[#333] tracking-widest uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>Bibliothèque</p>
                   <div className="grid grid-cols-2 gap-2 overflow-y-auto pr-1" style={{ maxHeight: '420px' }}>
-                    {avatars.filter(a => a.type !== 'personal' && (!avatarSearch || a.avatar_name?.toLowerCase().includes(avatarSearch.toLowerCase())))
-                      .map(avatar => (
-                        <AvatarCard key={avatar.avatar_id} avatar={avatar} selected={avatarId === avatar.avatar_id}
-                          onSelect={() => { setAvatarId(avatar.avatar_id); setSelectedAvatarObj(avatar) }} />
-                      ))}
+                    {avatars.filter(a => a.type !== 'personal' && (!avatarSearch || a.avatar_name?.toLowerCase().includes(avatarSearch.toLowerCase()))).map(avatar => (
+                      <AvatarCard key={avatar.avatar_id} avatar={avatar} selected={avatarId === avatar.avatar_id} onSelect={() => { setAvatarId(avatar.avatar_id); setSelectedAvatarObj(avatar) }} />
+                    ))}
                   </div>
                 </div>
-
-                {/* Voix + aperçu */}
                 <div style={{ width: '260px', flexShrink: 0 }}>
                   {selectedAvatarObj ? (
                     <div className="mb-4 rounded-xl overflow-hidden border border-[#c0392b]/30 bg-[#0d0d0d]">
                       <div style={{ height: '160px' }} className="relative overflow-hidden bg-[#111]">
-                        {selectedAvatarObj.preview_image_url
-                          ? <img src={selectedAvatarObj.preview_image_url} alt={selectedAvatarObj.avatar_name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-5xl">👤</div>}
+                        {selectedAvatarObj.preview_image_url ? <img src={selectedAvatarObj.preview_image_url} alt={selectedAvatarObj.avatar_name} className="w-full h-full object-cover" /> : <div className="w-full h-full flex items-center justify-center text-5xl">👤</div>}
                         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        <div className="absolute bottom-0 left-0 right-0 px-3 py-2">
-                          <p className="text-[11px] font-semibold text-white truncate">{selectedAvatarObj.avatar_name}</p>
-                        </div>
+                        <div className="absolute bottom-0 left-0 right-0 px-3 py-2"><p className="text-[11px] font-semibold text-white truncate">{selectedAvatarObj.avatar_name}</p></div>
                       </div>
                     </div>
                   ) : (
@@ -1007,29 +1382,19 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
                       <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>Voix</p>
                       <div className="flex gap-1.5 flex-wrap mb-2">
                         {[{ key:'fr', label:'🇫🇷' }, { key:'en', label:'🇺🇸' }, { key:'es', label:'🇪🇸' }, { key:'all', label:'🌍' }].map(f => (
-                          <button key={f.key} onClick={() => setVoiceFilter(f.key)}
-                            className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${voiceFilter === f.key ? 'border-[#c0392b] bg-[#c0392b]/10 text-[#c0392b]' : 'border-[#1e1e1e] text-[#555] hover:border-[#2a2a2a]'}`}>
-                            {f.label}
-                          </button>
+                          <button key={f.key} onClick={() => setVoiceFilter(f.key)} className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${voiceFilter === f.key ? 'border-[#c0392b] bg-[#c0392b]/10 text-[#c0392b]' : 'border-[#1e1e1e] text-[#555] hover:border-[#2a2a2a]'}`}>{f.label}</button>
                         ))}
                       </div>
                       <div className="space-y-1 overflow-y-auto" style={{ maxHeight: '300px' }}>
                         {filteredVoices.slice(0, 60).map(voice => (
-                          <button key={voice.voice_id}
-                            onClick={() => { setVoiceId(voice.voice_id); setSelectedVoiceObj(voice) }}
+                          <button key={voice.voice_id} onClick={() => { setVoiceId(voice.voice_id); setSelectedVoiceObj(voice) }}
                             className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-left transition ${voiceId === voice.voice_id ? 'border-[#c0392b] bg-[#c0392b]/8' : 'border-[#1a1a1a] bg-[#0d0d0d] hover:border-[#2a2a2a]'}`}>
-                            <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 text-[10px] ${voiceId === voice.voice_id ? 'bg-[#c0392b]/20 text-[#c0392b]' : 'bg-[#161616] text-[#333]'}`}>
-                              {Icon.mic}
-                            </div>
+                            <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${voiceId === voice.voice_id ? 'bg-[#c0392b]/20 text-[#c0392b]' : 'bg-[#161616] text-[#333]'}`}>{Icon.mic}</div>
                             <div className="flex-1 min-w-0">
                               <p className="text-[11px] font-medium text-[#bbb] truncate">{voice.name}</p>
                               <p className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>{voice.language || voice.locale}</p>
                             </div>
-                            {voiceId === voice.voice_id && (
-                              <div className="w-3.5 h-3.5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0">
-                                <svg width="7" height="7" viewBox="0 0 7 7" fill="none"><path d="M1 3.5L2.5 5 6 1.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                              </div>
-                            )}
+                            {voiceId === voice.voice_id && <div className="w-3.5 h-3.5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0"><svg width="7" height="7" viewBox="0 0 7 7" fill="none"><path d="M1 3.5L2.5 5 6 1.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg></div>}
                           </button>
                         ))}
                       </div>
@@ -1038,86 +1403,52 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
                 </div>
               </div>
             )}
-
             <div className="flex gap-2 mt-6">
-              <Btn variant="ghost" onClick={() => setEtape('script')}>{Icon.arrowLeft} Retour</Btn>
-              <Btn onClick={() => setEtape('publication')} disabled={!avatarId} className="flex-1 justify-center">
-                Continuer {Icon.arrow}
-              </Btn>
+              <Btn variant="ghost" onClick={() => setEtape(contenu === scriptGenere ? 'script_pret' : 'script_direct')}>{Icon.arrowLeft} Retour</Btn>
+              <Btn onClick={() => setEtape('confirmation')} disabled={!avatarId} className="flex-1 justify-center">Continuer {Icon.arrow}</Btn>
             </div>
             {!avatarId && avatars.length > 0 && <p className="text-[11px] text-amber-600 text-center mt-2">Sélectionne un avatar pour continuer</p>}
           </div>
         )}
 
         {/* ── ÉTAPE CONFIRMATION ── */}
-        {etape === 'publication' && (
+        {etape === 'confirmation' && (
           <div className="space-y-5">
-
-            {/* Info banner */}
             <div className="flex items-start gap-3 px-4 py-3.5 bg-amber-500/8 border border-amber-500/20 rounded-xl">
               <svg width="15" height="15" viewBox="0 0 15 15" fill="none" className="text-amber-400 flex-shrink-0 mt-0.5"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 5v3.5M7.5 10v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
               <div>
                 <p className="text-[12px] text-amber-400 font-medium mb-0.5">Génération uniquement</p>
-                <p className="text-[11px] text-amber-400/60 leading-relaxed">La vidéo sera générée et disponible dans ta bibliothèque. Tu pourras la publier sur YouTube manuellement depuis le menu <strong className="text-amber-400/80">···</strong> de chaque vidéo.</p>
+                <p className="text-[11px] text-amber-400/60 leading-relaxed">La vidéo sera générée et disponible dans ta bibliothèque. Publie sur YouTube manuellement depuis le menu <strong className="text-amber-400/80">···</strong>.</p>
               </div>
             </div>
-
-            {/* Récap */}
             <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
                 <span className="text-[11px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Récapitulatif</span>
               </div>
               <div className="divide-y divide-[#111]">
                 {[
-                  { label: 'Avatar', value: selectedAvatarObj?.avatar_name || avatarId || '—', icon: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 11.5c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-                  { label: 'Voix', value: selectedVoiceObj?.name || voiceId || '—', icon: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="1" width="5" height="6" rx="2.5" stroke="currentColor" strokeWidth="1.2"/><path d="M2 6.5a4.5 4.5 0 009 0M6.5 11v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-                  { label: 'Script', value: contenu ? `${contenu.split(' ').length} mots` : '—', icon: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3h9M2 6h6M2 9h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
-                ].map(({ label, value, icon }) => (
+                  { label: 'Avatar', value: selectedAvatarObj?.avatar_name || avatarId || '—' },
+                  { label: 'Voix',   value: selectedVoiceObj?.name || voiceId || '—' },
+                  { label: 'Script', value: contenu ? `${contenu.split(' ').length} mots` : '—' },
+                  { label: 'Titre',  value: titre || 'Généré par l'IA' },
+                ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between px-4 py-3">
-                    <div className="flex items-center gap-2.5 text-[#555]">
-                      {icon}
-                      <span className="text-[11px]" style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
-                    </div>
+                    <span className="text-[11px] text-[#555]" style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
                     <span className="text-[12px] text-[#888] truncate max-w-[200px] text-right">{value}</span>
                   </div>
                 ))}
               </div>
             </div>
-
-            {/* Pipeline visuel */}
-            <div className="flex items-center gap-2 px-4 py-3.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
-              {[
-                { label: 'Script IA', color: 'text-violet-400 bg-violet-400/10 border-violet-400/20' },
-                { label: 'Heygen', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
-                { label: 'Prête ✓', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
-              ].map((step, i, arr) => (
-                <div key={step.label} className="flex items-center gap-2 flex-1">
-                  <div className={`flex-1 text-center text-[10px] font-medium px-2 py-1.5 rounded-lg border ${step.color}`} style={{ fontFamily: "'DM Mono', monospace" }}>
-                    {step.label}
-                  </div>
-                  {i < arr.length - 1 && (
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[#333] flex-shrink-0"><path d="M2 5h6M6 3l2 2-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  )}
-                </div>
-              ))}
-            </div>
-
             <div className="flex gap-2 pt-1">
               <Btn variant="ghost" onClick={() => setEtape('avatar')}>{Icon.arrowLeft} Retour</Btn>
-              <button
-                onClick={lancerGeneration}
-                disabled={loading}
-                className="flex-1 flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all group"
-              >
+              <button onClick={lancerGeneration} disabled={loading}
+                className="flex-1 flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all group">
                 <div className="flex items-center gap-3">
                   <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                    {loading
-                      ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                      : <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5L9 6H13.5L9.75 8.75L11.25 13.5L7.5 10.75L3.75 13.5L5.25 8.75L1.5 6H6L7.5 1.5Z" stroke="white" strokeWidth="1.3" strokeLinejoin="round"/></svg>
-                    }
+                    {loading ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" /> : <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5L9 6H13.5L9.75 8.75L11.25 13.5L7.5 10.75L3.75 13.5L5.25 8.75L1.5 6H6L7.5 1.5Z" stroke="white" strokeWidth="1.3" strokeLinejoin="round"/></svg>}
                   </div>
                   <div className="text-left">
-                    <p className="text-[13px] font-semibold text-white">{loading ? 'Lancement en cours...' : 'Générer la vidéo'}</p>
+                    <p className="text-[13px] font-semibold text-white">{loading ? 'Lancement...' : 'Générer la vidéo'}</p>
                     <p className="text-[11px] text-white/60">Sans publication automatique</p>
                   </div>
                 </div>
