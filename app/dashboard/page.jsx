@@ -273,48 +273,129 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     setDeletingId(null); fetchVideos()
   }
 
-  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee'].includes(v.statut))
+  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret'].includes(v.statut))
 
-  const StatutBadge = ({ statut }) => {
-    const s = STATUTS[statut] || STATUTS['en_attente']
-    return (
-      <span className={`inline-flex items-center gap-1.5 text-[11px] px-2.5 py-1 rounded-full border ${s.color} ${s.bg}`} style={{ fontFamily: "'DM Mono', monospace" }}>
-        {s.pulse && <span className="w-1.5 h-1.5 rounded-full bg-current pulse-dot" />}
-        {s.label}
-      </span>
-    )
+  // ── Config visuelle par statut ──────────────────────────
+  const getStatusOverlay = (statut) => {
+    switch (statut) {
+      case 'en_attente':
+      case 'generation_script':
+        return {
+          label: 'Script en cours',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 1.5L9.5 6.5H14.5L10.5 9.5L12 14.5L8 11.5L4 14.5L5.5 9.5L1.5 6.5H6.5L8 1.5Z" stroke="white" strokeWidth="1.3" strokeLinejoin="round"/></svg>,
+          bg: 'bg-violet-500/20 border-violet-500/30',
+          dot: 'bg-violet-400',
+          badge: 'bg-violet-500/80 text-white',
+          glowColor: '#7c3aed',
+          pulse: true,
+        }
+      case 'script_pret':
+        return {
+          label: 'Draft',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 3h10M3 7h7M3 11h5" stroke="white" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+          bg: 'bg-[#111]/80 border-[#333]',
+          dot: 'bg-[#555]',
+          badge: 'bg-[#2a2a2a] text-[#888]',
+          glowColor: null,
+          pulse: false,
+        }
+      case 'generation_meta':
+      case 'meta_pret':
+        return {
+          label: 'Métadonnées IA',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M5 8h6M8 5v6" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+          bg: 'bg-blue-500/20 border-blue-500/30',
+          dot: 'bg-blue-400',
+          badge: 'bg-blue-500/80 text-white',
+          glowColor: '#3b82f6',
+          pulse: true,
+        }
+      case 'generation_video':
+      case 'video_en_cours':
+        return {
+          label: 'En file d\'attente',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M8 5v3l2 2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+          bg: 'bg-amber-500/20 border-amber-500/30',
+          dot: 'bg-amber-400',
+          badge: 'bg-amber-500/80 text-white',
+          glowColor: '#f59e0b',
+          pulse: true,
+        }
+      case 'upload_youtube':
+        return {
+          label: 'Upload YouTube',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 10V3M5 5.5L8 3l3 2.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.5 10.5v2a1 1 0 001 1h9a1 1 0 001-1v-2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+          bg: 'bg-orange-500/20 border-orange-500/30',
+          dot: 'bg-orange-400',
+          badge: 'bg-orange-500/80 text-white',
+          glowColor: '#f97316',
+          pulse: true,
+        }
+      case 'publiee':
+        return { label: null, badge: 'bg-emerald-500/20 text-emerald-400', dot: 'bg-emerald-400', glowColor: null, pulse: false }
+      case 'programmee':
+        return { label: null, badge: 'bg-sky-500/20 text-sky-400', dot: 'bg-sky-400', glowColor: null, pulse: false }
+      case 'erreur':
+        return {
+          label: 'Erreur',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M8 5v4M8 11v.5" stroke="white" strokeWidth="1.5" strokeLinecap="round"/></svg>,
+          bg: 'bg-red-500/20 border-red-500/30',
+          dot: 'bg-red-400',
+          badge: 'bg-red-500/20 text-red-400',
+          glowColor: '#ef4444',
+          pulse: false,
+        }
+      default:
+        return { badge: 'bg-[#2a2a2a] text-[#666]', dot: 'bg-[#444]', glowColor: null, pulse: false }
+    }
   }
 
-  const Pipeline = ({ statut }) => {
-    const steps = [
-      { key: 'generation_script', label: 'Script' },
-      { key: 'generation_video',  label: 'Heygen' },
-      { key: 'upload_youtube',    label: 'YouTube' },
-      { key: 'publiee',           label: 'Publié' },
-    ]
-    const order = Object.keys(STATUTS)
-    const currentIdx = order.indexOf(statut)
+  const getStatusLabel = (statut) => {
+    const map = {
+      en_attente: 'En attente', generation_script: 'Script IA', script_pret: 'Draft',
+      generation_meta: 'Métadonnées', meta_pret: 'Prêt', generation_video: 'En file',
+      video_en_cours: 'Heygen', upload_youtube: 'Upload', publiee: 'Publiée',
+      programmee: 'Programmée', erreur: 'Erreur',
+    }
+    return map[statut] || statut
+  }
+
+  // ── Thumbnail placeholder animé ──────────────────────────
+  const ThumbnailPlaceholder = ({ statut }) => {
+    const overlay = getStatusOverlay(statut)
     return (
-      <div className="flex items-center gap-1.5 mt-2">
-        {steps.map((step, i) => {
-          const stepIdx = order.indexOf(step.key)
-          const done = currentIdx > stepIdx
-          const active = currentIdx === stepIdx || (step.key === 'generation_video' && ['generation_video','video_en_cours'].includes(statut))
-          return (
-            <div key={step.key} className="flex items-center gap-1.5">
-              <div className={`flex items-center gap-1 px-2 py-0.5 rounded text-[10px] transition-all ${
-                done   ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' :
-                active ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20' :
-                         'bg-[#111] text-[#2a2a2a] border border-[#1a1a1a]'
-              }`} style={{ fontFamily: "'DM Mono', monospace" }}>
-                {done && <span className="text-emerald-500">{Icon.check}</span>}
-                {active && <span className="w-1.5 h-1.5 rounded-full bg-amber-400 pulse-dot" />}
-                {step.label}
-              </div>
-              {i < steps.length - 1 && <div className={`w-3 h-px ${done ? 'bg-emerald-500/30' : 'bg-[#1a1a1a]'}`} />}
+      <div className="w-full h-full relative bg-[#0d0d0d] flex items-center justify-center overflow-hidden">
+        <div className="absolute inset-0 bg-gradient-to-br from-[#141414] to-[#080808]" />
+        {/* Halo coloré pour les statuts actifs */}
+        {overlay.glowColor && (
+          <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full blur-2xl opacity-25"
+            style={{ background: overlay.glowColor }} />
+        )}
+        {/* Grille subtile */}
+        <div className="absolute inset-0 opacity-[0.03]" style={{
+          backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
+          backgroundSize: '18px 18px'
+        }} />
+        {/* Icône centrale */}
+        <div className="relative flex flex-col items-center gap-2.5">
+          <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${overlay.bg || 'bg-[#111] border-[#1e1e1e]'}`}>
+            {overlay.icon || (
+              <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                <rect x="1" y="3" width="16" height="12" rx="2" stroke="#2a2a2a" strokeWidth="1.3"/>
+                <path d="M7 6.5l5 2.5-5 2.5V6.5Z" fill="#2a2a2a"/>
+              </svg>
+            )}
+          </div>
+          {/* Dots animés pour les statuts en cours */}
+          {overlay.pulse && (
+            <div className="flex items-center gap-1">
+              {[0, 0.15, 0.3].map((delay, i) => (
+                <div key={i} className={`w-1 h-1 rounded-full pulse-dot ${overlay.dot}`}
+                  style={{ animationDelay: `${delay}s` }} />
+              ))}
             </div>
-          )
-        })}
+          )}
+        </div>
       </div>
     )
   }
@@ -322,8 +403,11 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   if (loading) return (
     <div>
       <PageHeader title="Vidéos" />
-      <div className="px-10 py-12 text-center">
-        <p className="text-[12px] text-[#333] animate-pulse" style={{ fontFamily: "'DM Mono', monospace" }}>Chargement...</p>
+      <div className="px-10 py-12 flex items-center justify-center">
+        <div className="flex items-center gap-3 text-[#333]">
+          <div className="w-4 h-4 rounded-full border-2 border-[#c0392b] border-t-transparent animate-spin" />
+          <span className="text-[12px]" style={{ fontFamily: "'DM Mono', monospace" }}>Chargement...</span>
+        </div>
       </div>
     </div>
   )
@@ -332,13 +416,13 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     <div>
       <PageHeader
         title="Vidéos"
-        sub={videos.length > 0 ? `${videos.length} vidéo${videos.length !== 1 ? 's' : ''} · ${hasActive ? 'Pipeline actif' : 'Tout est calme'}` : 'Crée ta première vidéo'}
+        sub={videos.length > 0 ? `${videos.length} vidéo${videos.length !== 1 ? 's' : ''}` : 'Crée ta première vidéo'}
         action={
           <div className="flex items-center gap-3">
             {hasActive && (
               <div className="flex items-center gap-2 text-[12px] text-amber-400" style={{ fontFamily: "'DM Mono', monospace" }}>
                 <span className="w-1.5 h-1.5 rounded-full bg-amber-400 pulse-dot" />
-                En cours
+                Pipeline actif
               </div>
             )}
             <Btn variant="subtle" onClick={fetchVideos}>{Icon.refresh} Actualiser</Btn>
@@ -346,6 +430,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           </div>
         }
       />
+
       <div className="px-10 py-8">
 
         {/* Modal édition */}
@@ -353,7 +438,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="bg-[#0e0e0e] border border-[#222] rounded-2xl p-6 w-full max-w-md mx-4 space-y-4">
               <div className="flex items-center justify-between">
-                <h3 style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[18px] text-white">Modifier la vidéo</h3>
+                <h3 style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[18px] text-white">Modifier</h3>
                 <button onClick={() => setEditingVideo(null)} className="text-[#444] hover:text-white transition">{Icon.close}</button>
               </div>
               <div>
@@ -375,7 +460,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
         )}
 
         {videos.length === 0 ? (
-          // ── Empty state ──
           <div className="flex flex-col items-center gap-5 py-24 border border-dashed border-[#1a1a1a] rounded-2xl">
             <div className="w-14 h-14 rounded-2xl border border-[#1e1e1e] bg-[#0d0d0d] flex items-center justify-center text-[#2a2a2a]">{Icon.film}</div>
             <div className="text-center">
@@ -385,56 +469,110 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
             <Btn onClick={onNouvelleVideo}>{Icon.plus} Nouvelle vidéo</Btn>
           </div>
         ) : (
-          <div className="space-y-2">
-            {videos.map(v => (
-              <div key={v.id} className={`border rounded-xl p-5 transition-all ${
-                v.statut === 'erreur' ? 'border-red-500/20 bg-red-500/3' :
-                ['publiee','programmee'].includes(v.statut) ? 'border-[#1a1a1a] bg-[#080808]' :
-                'border-amber-500/15 bg-amber-500/3'
-              }`}>
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex-1 min-w-0">
-                    <p className="text-[14px] font-medium text-white truncate mb-1">
-                      {v.titre || <span className="text-[#333] italic">Titre en cours de génération...</span>}
-                    </p>
-                    <div className="flex items-center gap-3 flex-wrap">
-                      <span className="text-[11px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
-                        {new Date(v.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })}
-                      </span>
-                      {v.channel_id && <span className="text-[11px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>· {v.channel_id}</span>}
-                      {v.duree && <span className="text-[11px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>· {v.duree === 60 ? '~1 min' : v.duree === 180 ? '~3 min' : '~10 min'}</span>}
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            {videos.map(v => {
+              const overlay = getStatusOverlay(v.statut)
+              const isActive = overlay.pulse
+              const isDone = ['publiee', 'programmee'].includes(v.statut)
+              const isError = v.statut === 'erreur'
+              const isDraft = v.statut === 'script_pret'
+
+              return (
+                <div key={v.id}
+                  className="group relative flex flex-col rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40">
+
+                  {/* ── Vignette 16/9 ── */}
+                  <div className="relative overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                    {v.thumbnail_url ? (
+                      <img src={v.thumbnail_url} alt={v.titre} className="w-full h-full object-cover" />
+                    ) : (
+                      <ThumbnailPlaceholder statut={v.statut} />
+                    )}
+
+                    {/* Overlay statut actif — centré sur la vignette */}
+                    {isActive && (
+                      <div className={`absolute inset-0 border flex items-center justify-center ${overlay.bg}`}>
+                        <div className="bg-black/60 backdrop-blur-sm rounded-xl px-3.5 py-2 flex items-center gap-2 shadow-lg">
+                          <span className={`w-1.5 h-1.5 rounded-full pulse-dot flex-shrink-0 ${overlay.dot}`} />
+                          <span className="text-[11px] text-white font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
+                            {overlay.label}
+                          </span>
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Badge Draft */}
+                    {isDraft && (
+                      <div className="absolute top-2 left-2 bg-[#1a1a1a]/90 backdrop-blur-sm border border-[#333] text-[#888] text-[10px] px-2.5 py-1 rounded-lg font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
+                        Draft
+                      </div>
+                    )}
+
+                    {/* Badge erreur */}
+                    {isError && (
+                      <div className="absolute top-2 left-2 bg-red-500/20 backdrop-blur-sm border border-red-500/30 text-red-400 text-[10px] px-2.5 py-1 rounded-lg font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
+                        Erreur
+                      </div>
+                    )}
+
+                    {/* Durée pour les vidéos terminées */}
+                    {isDone && v.duree && (
+                      <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded-md font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
+                        {v.duree === 60 ? '1 min' : v.duree === 180 ? '3 min' : '10 min'}
+                      </div>
+                    )}
+
+                    {/* Hover actions overlay */}
+                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                      {v.youtube_video_id && (
+                        <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
+                          className="w-9 h-9 rounded-lg bg-[#c0392b] hover:bg-[#a93226] flex items-center justify-center transition text-white shadow-lg"
+                          title="Voir sur YouTube">
+                          {Icon.external}
+                        </a>
+                      )}
+                      {v.thumbnail_url && (
+                        <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
+                          className="w-9 h-9 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 flex items-center justify-center transition text-white shadow-lg"
+                          title="Télécharger">
+                          {Icon.upload}
+                        </a>
+                      )}
+                      <button onClick={() => ouvrirEdit(v)}
+                        className="w-9 h-9 rounded-lg bg-[#1a1a1a]/90 hover:bg-[#2a2a2a] border border-[#333] flex items-center justify-center transition text-[#aaa] hover:text-white shadow-lg"
+                        title="Éditer">
+                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                          <path d="M9 2L11 4L4.5 10.5L2 11L2.5 8.5L9 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
+                        </svg>
+                      </button>
+                      <button onClick={() => supprimerVideo(v.id)} disabled={deletingId === v.id}
+                        className="w-9 h-9 rounded-lg bg-[#1a1a1a]/90 hover:bg-red-500/20 border border-[#333] hover:border-red-500/40 flex items-center justify-center transition text-[#555] hover:text-red-400 disabled:opacity-30 shadow-lg"
+                        title="Supprimer">
+                        {deletingId === v.id
+                          ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
+                          : Icon.trash}
+                      </button>
                     </div>
-                    {!['publiee', 'erreur', 'programmee'].includes(v.statut) && <Pipeline statut={v.statut} />}
-                    {v.statut === 'erreur' && (
-                      <p className="text-[11px] text-red-400 mt-2" style={{ fontFamily: "'DM Mono', monospace" }}>Une erreur est survenue pendant la génération</p>
-                    )}
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-                    <StatutBadge statut={v.statut} />
-                    {v.thumbnail_url && (
-                      <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 text-[11px] text-emerald-400 hover:text-white transition border border-emerald-400/20 hover:border-emerald-400/60 px-2.5 py-1.5 rounded-lg">
-                        {Icon.upload} Télécharger
-                      </a>
-                    )}
-                    <button onClick={() => ouvrirEdit(v)}
-                      className="flex items-center gap-1.5 text-[11px] text-[#555] hover:text-white transition border border-[#222] hover:border-[#444] px-2.5 py-1.5 rounded-lg">
-                      ✏️ Éditer
-                    </button>
-                    {v.youtube_video_id && (
-                      <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-1.5 text-[11px] text-[#c0392b] hover:text-white transition border border-[#c0392b]/20 hover:border-[#c0392b] px-2.5 py-1.5 rounded-lg">
-                        {Icon.external} YouTube
-                      </a>
-                    )}
-                    <button onClick={() => supprimerVideo(v.id)} disabled={deletingId === v.id}
-                      className="flex items-center gap-1.5 text-[11px] text-[#333] hover:text-red-400 transition border border-[#1a1a1a] hover:border-red-500/30 px-2.5 py-1.5 rounded-lg disabled:opacity-30">
-                      {deletingId === v.id ? '...' : Icon.trash}
-                    </button>
+
+                  {/* ── Infos bas de card ── */}
+                  <div className="px-3 py-2.5 flex flex-col gap-1.5 flex-1">
+                    <p className="text-[12px] font-medium text-white leading-snug line-clamp-2" style={{ minHeight: '34px' }}>
+                      {v.titre || <span className="text-[#2a2a2a] italic font-normal">Titre en génération...</span>}
+                    </p>
+                    <div className="flex items-center justify-between mt-auto pt-1">
+                      <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                        {new Date(v.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
+                      </span>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${overlay.badge}`} style={{ fontFamily: "'DM Mono', monospace" }}>
+                        {overlay.pulse && <span className={`w-1 h-1 rounded-full pulse-dot flex-shrink-0 ${overlay.dot}`} />}
+                        {getStatusLabel(v.statut)}
+                      </span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </div>
