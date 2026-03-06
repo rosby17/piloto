@@ -259,8 +259,8 @@ export default function Dashboard() {
       </aside>
 
       {/* MAIN */}
-      <div className="ml-[220px] flex-1 min-h-screen">
-        <div className="fade-in" key={activeTab + (nouvelleVideo ? '-new' : '')}>
+      <div className="ml-[220px] flex-1 flex flex-col h-screen overflow-hidden">
+        <div className="fade-in flex flex-col flex-1 overflow-hidden" key={activeTab + (nouvelleVideo ? '-new' : '')}>
           {activeTab === 'videos' && !nouvelleVideo && (
             <MesVideos
               user={user}
@@ -1578,6 +1578,7 @@ function VoixOff({ user }) {
   const [heygenKey, setHeygenKey]         = useState('')
   const [speed, setSpeed]                 = useState(1.0)
   const [pitch, setPitch]                 = useState(0)
+  const [settingsTab, setSettingsTab]     = useState('settings')
 
   useEffect(() => {
     const init = async () => {
@@ -1636,227 +1637,274 @@ function VoixOff({ user }) {
   }
 
   const wordCount  = script.trim() ? script.trim().split(/\s+/).length : 0
+  const charCount  = script.length
   const estMinutes = wordCount > 0 ? Math.ceil(wordCount / 130) : 0
 
   return (
-    <div>
-      <PageHeader
-        title="Voix off"
-        sub="Transforme ton script en audio IA avec HeyGen TTS."
-      />
+    <div className="flex flex-col" style={{ height: 'calc(100vh - 0px)' }}>
 
-      <div className="px-10 py-8 max-w-[860px]">
+      {/* Alerte clé manquante */}
+      {!heygenKey && (
+        <div className="mx-6 mt-4 flex items-center gap-3 px-4 py-3 bg-amber-500/8 border border-amber-500/20 rounded-xl flex-shrink-0">
+          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-amber-400 flex-shrink-0">
+            <circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.3"/>
+            <path d="M7 4.5v3M7 9v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+          </svg>
+          <p className="text-[12px] text-amber-400">Configure ta clé HeyGen dans les <strong>Paramètres</strong> pour accéder aux voix.</p>
+        </div>
+      )}
 
-        {!heygenKey && (
-          <div className="flex items-center gap-3 px-4 py-3.5 bg-amber-500/8 border border-amber-500/20 rounded-xl mb-6">
-            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" className="text-amber-400 flex-shrink-0">
-              <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/>
-              <path d="M7.5 5v3.5M7.5 10v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-            </svg>
-            <p className="text-[12px] text-amber-400">
-              Configure ta clé HeyGen dans les <strong>Paramètres</strong> pour accéder aux voix.
-            </p>
-          </div>
-        )}
+      {/* ── Layout principal : texte gauche | panel droite ── */}
+      <div className="flex flex-1 overflow-hidden">
 
-        <div className="flex gap-6">
+        {/* ── ZONE TEXTE (gauche) ── */}
+        <div className="flex-1 flex flex-col relative" style={{ background: '#090909' }}>
 
-          {/* ── Colonne gauche ── */}
-          <div className="flex-1 min-w-0 space-y-4">
+          {/* Textarea */}
+          <textarea
+            value={script}
+            onChange={e => setScript(e.target.value)}
+            className="flex-1 w-full bg-transparent px-12 py-10 text-[15px] text-[#e0e0e0] placeholder-[#1e1e1e] focus:outline-none resize-none leading-[1.75]"
+            style={{ fontFamily: "'DM Sans', sans-serif" }}
+            placeholder="Commence à écrire ou colle ton script ici..."
+          />
 
-            <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
-              <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
-                {Icon.text}
-                <span className="text-[11px] text-[#555] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>
-                  Script à lire
-                </span>
-                {wordCount > 0 && (
-                  <span className="ml-auto text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
-                    {wordCount} mots · ~{estMinutes} min
+          {/* Barre bas : stats + bouton générer */}
+          <div className="flex-shrink-0 border-t border-[#111] px-8 py-4 flex items-center justify-between" style={{ background: '#090909' }}>
+            <div className="flex items-center gap-4">
+              <span className="text-[11px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                {charCount} car.
+              </span>
+              {wordCount > 0 && (
+                <>
+                  <span className="text-[#1a1a1a]">·</span>
+                  <span className="text-[11px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    {wordCount} mots
                   </span>
-                )}
-              </div>
-              <textarea
-                value={script}
-                onChange={e => setScript(e.target.value)}
-                className="w-full bg-[#0d0d0d] px-4 py-4 text-[13px] text-white placeholder-[#2a2a2a] focus:outline-none resize-none"
-                rows={13}
-                placeholder="Entre le texte à transformer en voix off..."
-              />
+                  <span className="text-[#1a1a1a]">·</span>
+                  <span className="text-[11px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    ~{estMinutes} min
+                  </span>
+                </>
+              )}
+              {error && <span className="text-[11px] text-red-400 ml-2">{error}</span>}
             </div>
-
-            <div className="grid grid-cols-2 gap-3">
-              <div className="border border-[#1a1a1a] rounded-xl p-4 bg-[#0a0a0a]">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Vitesse</span>
-                  <span className="text-[11px] text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{speed.toFixed(1)}x</span>
-                </div>
-                <input type="range" min="0.5" max="2.0" step="0.1" value={speed}
-                  onChange={e => setSpeed(parseFloat(e.target.value))}
-                  className="w-full accent-[#c0392b] cursor-pointer" />
-                <div className="flex justify-between mt-1.5">
-                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Lent 0.5x</span>
-                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Rapide 2x</span>
-                </div>
-              </div>
-              <div className="border border-[#1a1a1a] rounded-xl p-4 bg-[#0a0a0a]">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Pitch</span>
-                  <span className="text-[11px] text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{pitch > 0 ? `+${pitch}` : pitch}</span>
-                </div>
-                <input type="range" min="-10" max="10" step="1" value={pitch}
-                  onChange={e => setPitch(parseInt(e.target.value))}
-                  className="w-full accent-[#c0392b] cursor-pointer" />
-                <div className="flex justify-between mt-1.5">
-                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Grave -10</span>
-                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Aigu +10</span>
-                </div>
-              </div>
-            </div>
-
-            {error && (
-              <div className="px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-xl">
-                <p className="text-[12px] text-red-400">{error}</p>
-              </div>
-            )}
 
             <button
               onClick={generer}
               disabled={generating || !script.trim() || !voiceId}
-              className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-all group">
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
-                  {generating
-                    ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
-                    : Icon.mic
-                  }
-                </div>
-                <div className="text-left">
-                  <p className="text-[13px] font-semibold text-white">
-                    {generating ? 'Génération en cours...' : 'Générer la voix off'}
-                  </p>
-                  <p className="text-[11px] text-white/60">
-                    {voiceId
-                      ? `HeyGen TTS · ${selectedVoice?.name || voiceId}`
-                      : 'Sélectionne une voix à droite'
-                    }
-                  </p>
-                </div>
-              </div>
-              {!generating && (
-                <span className="text-white/70 group-hover:translate-x-0.5 transition-transform">{Icon.arrow}</span>
-              )}
-            </button>
-
-            {audioUrl && (
-              <div className="border border-emerald-500/25 bg-emerald-500/5 rounded-xl overflow-hidden">
-                <div className="flex items-center gap-2.5 px-4 py-3 border-b border-emerald-500/15">
-                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="text-emerald-400">
-                    <path d="M2 4l3.5 2-3.5 2V4Z" fill="currentColor"/>
-                    <path d="M8 3.5v6M10.5 5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+              className="flex items-center gap-2.5 px-5 py-2.5 rounded-lg text-[13px] font-medium text-white transition-all disabled:opacity-25 disabled:cursor-not-allowed"
+              style={{ background: generating ? '#8a2820' : '#c0392b' }}>
+              {generating
+                ? <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin flex-shrink-0" />
+                : <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="flex-shrink-0">
+                    <rect x="3.5" y="1" width="4" height="7" rx="2" stroke="currentColor" strokeWidth="1.3"/>
+                    <path d="M1.5 7.5a5 5 0 009 0M5.5 12v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
                   </svg>
-                  <span className="text-[11px] text-emerald-400 tracking-widests uppercase font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
-                    Audio généré ✓
-                  </span>
-                </div>
-                <div className="p-4 space-y-3">
-                  <audio src={audioUrl} controls className="w-full" style={{ height: '40px' }} />
-                  <a
-                    href={audioUrl}
-                    download="voix-off-piloto.mp3"
-                    className="flex items-center justify-center gap-2 py-2.5 text-[12px] text-[#888] hover:text-white border border-[#222] hover:border-[#333] rounded-lg transition w-full">
-                    {Icon.download} Télécharger l'audio
-                  </a>
-                </div>
-              </div>
-            )}
+              }
+              {generating ? 'Génération...' : 'Générer'}
+            </button>
           </div>
 
-          {/* ── Colonne droite : sélecteur voix ── */}
-          <div style={{ width: '240px', flexShrink: 0 }}>
-            <div className="border border-[#1a1a1a] rounded-xl overflow-hidden bg-[#0a0a0a] sticky top-6">
-              <div className="px-3.5 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
-                <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>
-                  Voix
-                </span>
-                {voices.length > 0 && (
-                  <span className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
-                    {filteredVoices.length}/{voices.length}
-                  </span>
-                )}
+          {/* Lecteur audio */}
+          {audioUrl && (
+            <div className="flex-shrink-0 border-t border-emerald-500/20 px-8 py-3.5 flex items-center gap-4" style={{ background: 'rgba(16,185,129,0.04)' }}>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <span className="text-[11px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Audio prêt</span>
               </div>
-              <div className="p-3 space-y-2.5">
-
-                {selectedVoice && (
-                  <div className="flex items-center gap-2 px-3 py-2 bg-[#c0392b]/8 border border-[#c0392b]/20 rounded-lg">
-                    <span className="text-[#c0392b]">{Icon.mic}</span>
-                    <p className="text-[11px] text-[#c0392b] font-medium truncate">{selectedVoice.name}</p>
-                  </div>
-                )}
-
-                <div className="flex gap-1.5 flex-wrap">
-                  {[
-                    { key: 'fr', label: '🇫🇷' },
-                    { key: 'en', label: '🇺🇸' },
-                    { key: 'es', label: '🇪🇸' },
-                    { key: 'all', label: '🌍' },
-                  ].map(f => (
-                    <button key={f.key} onClick={() => setVoiceFilter(f.key)}
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${
-                        voiceFilter === f.key
-                          ? 'border-[#c0392b] bg-[#c0392b]/10 text-[#c0392b]'
-                          : 'border-[#1e1e1e] text-[#555] hover:border-[#2a2a2a]'
-                      }`}>
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
-
-                {loadingVoices && (
-                  <div className="flex items-center justify-center gap-2 py-8">
-                    <div className="w-3.5 h-3.5 border-2 border-[#c0392b]/30 border-t-[#c0392b] rounded-full animate-spin" />
-                    <span className="text-[11px] text-[#444]">Chargement...</span>
-                  </div>
-                )}
-
-                {!loadingVoices && voices.length === 0 && (
-                  <div className="py-10 flex flex-col items-center gap-2 text-center">
-                    <span className="text-2xl text-[#1a1a1a]">🎙️</span>
-                    <p className="text-[11px] text-[#333]">Aucune voix — configure ta clé HeyGen dans Paramètres</p>
-                  </div>
-                )}
-
-                <div className="space-y-1 overflow-y-auto" style={{ maxHeight: '500px' }}>
-                  {filteredVoices.slice(0, 80).map(voice => (
-                    <button key={voice.voice_id}
-                      onClick={() => { setVoiceId(voice.voice_id); setSelectedVoice(voice) }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-left transition ${
-                        voiceId === voice.voice_id
-                          ? 'border-[#c0392b] bg-[#c0392b]/8'
-                          : 'border-[#1a1a1a] bg-[#0d0d0d] hover:border-[#2a2a2a]'
-                      }`}>
-                      <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${
-                        voiceId === voice.voice_id ? 'bg-[#c0392b]/20 text-[#c0392b]' : 'bg-[#161616] text-[#333]'
-                      }`}>
-                        {Icon.mic}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[11px] font-medium text-[#bbb] truncate">{voice.name}</p>
-                        <p className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
-                          {voice.language || voice.locale}
-                        </p>
-                      </div>
-                      {voiceId === voice.voice_id && (
-                        <div className="w-3.5 h-3.5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0">
-                          {Icon.check}
-                        </div>
-                      )}
-                    </button>
-                  ))}
-                </div>
-
-              </div>
+              <audio src={audioUrl} controls className="flex-1" style={{ height: '32px' }} />
+              <a
+                href={audioUrl}
+                download="voix-off-piloto.mp3"
+                className="flex items-center gap-1.5 text-[11px] text-[#444] hover:text-[#888] border border-[#1e1e1e] hover:border-[#2a2a2a] px-3 py-2 rounded-lg transition flex-shrink-0">
+                <svg width="11" height="11" viewBox="0 0 14 14" fill="none">
+                  <path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                </svg>
+                DL
+              </a>
             </div>
+          )}
+        </div>
+
+        {/* ── PANNEAU DROITE (settings) ── */}
+        <div className="flex-shrink-0 flex flex-col border-l border-[#131313]" style={{ width: '290px', background: '#0c0c0c' }}>
+
+          {/* Tabs */}
+          <div className="flex flex-shrink-0 border-b border-[#131313]">
+            {[{ id: 'settings', label: 'Réglages' }, { id: 'history', label: 'Historique' }].map(tab => (
+              <button key={tab.id} onClick={() => setSettingsTab(tab.id)}
+                className={`flex-1 py-3.5 text-[12px] font-medium transition ${
+                  settingsTab === tab.id
+                    ? 'text-white border-b-2 border-[#c0392b] -mb-px'
+                    : 'text-[#383838] hover:text-[#666]'
+                }`}>
+                {tab.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex-1 overflow-y-auto">
+            {settingsTab === 'settings' && (
+              <div className="p-5 space-y-5">
+
+                {/* Voix sélectionnée */}
+                <div>
+                  <p className="text-[10px] text-[#333] uppercase tracking-widest mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>Voix</p>
+                  <div className={`flex items-center gap-3 px-3.5 py-3 rounded-xl border ${selectedVoice ? 'border-[#c0392b]/30 bg-[#c0392b]/5' : 'border-[#1a1a1a] bg-[#0a0a0a]'}`}>
+                    <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0" style={{ background: selectedVoice ? 'rgba(192,57,43,0.15)' : '#141414' }}>
+                      <svg width="12" height="12" viewBox="0 0 14 14" fill="none" className={selectedVoice ? 'text-[#c0392b]' : 'text-[#333]'}>
+                        <rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" strokeWidth="1.3"/>
+                        <path d="M2 7.5a5 5 0 0010 0M7 12v1.5" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                      </svg>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-[12px] font-medium truncate" style={{ color: selectedVoice ? '#e0e0e0' : '#2a2a2a' }}>
+                        {selectedVoice?.name || 'Aucune voix sélectionnée'}
+                      </p>
+                      {selectedVoice && (
+                        <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                          {selectedVoice.language || selectedVoice.locale || 'HeyGen TTS'}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Liste des voix */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-[10px] text-[#333] uppercase tracking-widest" style={{ fontFamily: "'DM Mono', monospace" }}>Choisir</p>
+                    {voices.length > 0 && (
+                      <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                        {filteredVoices.length}/{voices.length}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Filtres langue */}
+                  <div className="flex gap-1 mb-2">
+                    {[{ key: 'fr', label: '🇫🇷 FR' }, { key: 'en', label: '🇺🇸 EN' }, { key: 'es', label: '🇪🇸 ES' }, { key: 'all', label: '🌍' }].map(f => (
+                      <button key={f.key} onClick={() => setVoiceFilter(f.key)}
+                        className={`flex-1 py-1.5 text-[10px] rounded-lg border transition ${
+                          voiceFilter === f.key
+                            ? 'border-[#c0392b]/40 bg-[#c0392b]/10 text-[#c0392b]'
+                            : 'border-[#161616] text-[#333] hover:text-[#555]'
+                        }`}>
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {/* Liste scrollable */}
+                  <div className="border border-[#131313] rounded-xl overflow-hidden">
+                    {loadingVoices ? (
+                      <div className="flex items-center justify-center gap-2 py-8">
+                        <div className="w-3 h-3 border-2 border-[#c0392b]/30 border-t-[#c0392b] rounded-full animate-spin" />
+                        <span className="text-[11px] text-[#333]">Chargement...</span>
+                      </div>
+                    ) : voices.length === 0 ? (
+                      <div className="py-8 flex flex-col items-center gap-2 text-center px-4">
+                        <span className="text-xl" style={{ color: '#1a1a1a' }}>🎙️</span>
+                        <p className="text-[11px] text-[#2a2a2a]">Configure ta clé HeyGen dans Paramètres</p>
+                      </div>
+                    ) : (
+                      <div className="overflow-y-auto" style={{ maxHeight: '220px' }}>
+                        {filteredVoices.slice(0, 80).map((voice, i) => (
+                          <button key={voice.voice_id}
+                            onClick={() => { setVoiceId(voice.voice_id); setSelectedVoice(voice) }}
+                            className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 text-left transition ${
+                              i > 0 ? 'border-t border-[#0f0f0f]' : ''
+                            } ${voiceId === voice.voice_id ? 'bg-[#c0392b]/8' : 'hover:bg-[#0f0f0f]'}`}>
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 transition ${
+                              voiceId === voice.voice_id ? 'bg-[#c0392b]' : 'bg-[#151515]'
+                            }`}>
+                              {voiceId === voice.voice_id
+                                ? <svg width="8" height="8" viewBox="0 0 8 8" fill="none"><path d="M1.5 4L3 5.5 6.5 2" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                : <svg width="7" height="7" viewBox="0 0 10 10" fill="none"><rect x="3" y="1" width="4" height="5" rx="2" stroke="#2a2a2a" strokeWidth="1.2"/><path d="M1.5 6.5a3.5 3.5 0 007 0" stroke="#2a2a2a" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                              }
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className={`text-[11px] truncate ${voiceId === voice.voice_id ? 'text-white font-medium' : 'text-[#555]'}`}>
+                                {voice.name}
+                              </p>
+                              <p className="text-[10px] text-[#272727]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                                {voice.language || voice.locale}
+                              </p>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div className="h-px bg-[#111]" />
+
+                {/* Vitesse */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <p className="text-[10px] text-[#333] uppercase tracking-widest" style={{ fontFamily: "'DM Mono', monospace" }}>Vitesse</p>
+                    <span className="text-[11px] text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{speed.toFixed(1)}x</span>
+                  </div>
+                  <input type="range" min="0.5" max="2.0" step="0.1" value={speed}
+                    onChange={e => setSpeed(parseFloat(e.target.value))}
+                    className="w-full cursor-pointer h-[2px] rounded-full appearance-none"
+                    style={{ accentColor: '#c0392b', background: `linear-gradient(to right, #c0392b ${((speed - 0.5) / 1.5) * 100}%, #1a1a1a ${((speed - 0.5) / 1.5) * 100}%)` }}
+                  />
+                  <div className="flex justify-between mt-1.5">
+                    <span className="text-[9px] text-[#222]">Lent</span>
+                    <span className="text-[9px] text-[#222]">Rapide</span>
+                  </div>
+                </div>
+
+                <div className="h-px bg-[#111]" />
+
+                {/* Pitch */}
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <p className="text-[10px] text-[#333] uppercase tracking-widest" style={{ fontFamily: "'DM Mono', monospace" }}>Pitch</p>
+                    <span className="text-[11px] text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{pitch > 0 ? `+${pitch}` : pitch}</span>
+                  </div>
+                  <input type="range" min="-10" max="10" step="1" value={pitch}
+                    onChange={e => setPitch(parseInt(e.target.value))}
+                    className="w-full cursor-pointer h-[2px] rounded-full appearance-none"
+                    style={{ accentColor: '#c0392b', background: `linear-gradient(to right, #c0392b ${((pitch + 10) / 20) * 100}%, #1a1a1a ${((pitch + 10) / 20) * 100}%)` }}
+                  />
+                  <div className="flex justify-between mt-1.5">
+                    <span className="text-[9px] text-[#222]">Grave</span>
+                    <span className="text-[9px] text-[#222]">Aigu</span>
+                  </div>
+                </div>
+
+                <div className="h-px bg-[#111]" />
+
+                {/* Stats */}
+                <div className="rounded-xl border border-[#111] overflow-hidden">
+                  {[
+                    { label: 'Moteur', value: 'HeyGen TTS' },
+                    { label: 'Mots', value: wordCount || '—' },
+                    { label: 'Durée est.', value: wordCount ? `~${estMinutes} min` : '—' },
+                  ].map((row, i) => (
+                    <div key={row.label} className={`flex items-center justify-between px-3.5 py-2.5 ${i > 0 ? 'border-t border-[#0f0f0f]' : ''}`} style={{ background: '#0a0a0a' }}>
+                      <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>{row.label}</span>
+                      <span className="text-[10px] text-[#444]">{row.value}</span>
+                    </div>
+                  ))}
+                </div>
+
+              </div>
+            )}
+
+            {settingsTab === 'history' && (
+              <div className="flex flex-col items-center justify-center py-20 px-5 text-center gap-3">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" className="text-[#1e1e1e]">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5"/>
+                  <path d="M12 7v5l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round"/>
+                </svg>
+                <p className="text-[12px] text-[#2a2a2a]">Aucune génération dans cette session</p>
+              </div>
+            )}
           </div>
         </div>
       </div>
