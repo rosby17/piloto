@@ -685,6 +685,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 // ── NOUVELLE VIDÉO ─────────────────────────────────────────
 function NouvelleVideo({ user, onBack, onGoToParams }) {
   // étapes: 'choix' | 'analyse' | 'suggestions' | 'script_pret' | 'avatar' | 'confirmation'
+  const router = useRouter()
   const [etape, setEtape] = useState('choix')
 
   // Script flow
@@ -1151,7 +1152,7 @@ ${scriptBrut}`
 
                 {/* CTA principal — Aller dans Piloto Studio */}
                 <button
-                  onClick={() => { setContenu(scriptGenere); setEtape('avatar') }}
+                  onClick={() => { setContenu(scriptGenere); router.push(`/dashboard/studio?script=${encodeURIComponent(scriptGenere)}&title=${encodeURIComponent(titre || projectTitle || 'Nouveau projet')}`) }}
                   className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] rounded-xl transition-all group">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
