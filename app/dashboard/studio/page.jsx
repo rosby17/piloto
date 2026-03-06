@@ -103,11 +103,24 @@ function StudioContent() {
       if (!u) { router.push('/login'); return }
       setUser(u)
 
-      // Load script & title from URL params
-      const s = searchParams.get('script')
-      const t = searchParams.get('title')
-      if (s) setScript(decodeURIComponent(s))
-      if (t) setProjectTitle(decodeURIComponent(t))
+      // Load script & title — sessionStorage (fiable) ou URL params
+      const storedScript = sessionStorage.getItem('piloto_studio_script')
+      const storedTitle  = sessionStorage.getItem('piloto_studio_title')
+      const urlScript    = searchParams.get('script')
+      const urlTitle     = searchParams.get('title')
+
+      if (storedScript) {
+        setScript(storedScript)
+        sessionStorage.removeItem('piloto_studio_script')
+      } else if (urlScript) {
+        setScript(urlScript)
+      }
+      if (storedTitle) {
+        setProjectTitle(storedTitle)
+        sessionStorage.removeItem('piloto_studio_title')
+      } else if (urlTitle) {
+        setProjectTitle(urlTitle)
+      }
 
       // Load profile
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', u.id).single()
