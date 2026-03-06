@@ -16,9 +16,8 @@ export async function POST(request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        voice_id:  voiceId,
-        text:      script,
-        text_type: 'plain',
+        voice_id: voiceId,
+        text:     script,
       }),
     })
 
