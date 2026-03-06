@@ -274,15 +274,7 @@ async function runPipeline({
 
   // Attend la fin de génération HeyGen (polling)
   const videoUrl = await attendreVideoHeygen(heygenVideoId, heygenKey)
-  await update('upload_youtube', { thumbnail_url: videoUrl })
 
-  // Upload sur YouTube
-  const youtubeVideoId = await uploaderSurYoutube({
-    videoUrl, titre, description, channelData: chaineData, datePublication
-  })
-
-  // Terminé !
-  await update(datePublication ? 'programmee' : 'publiee', {
-    youtube_video_id: youtubeVideoId
-  })
+  // Vidéo prête — on s'arrête ici, la publication est manuelle
+  await update('video_prete', { thumbnail_url: videoUrl })
 }
