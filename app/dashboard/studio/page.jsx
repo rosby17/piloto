@@ -86,6 +86,8 @@ function StudioContent() {
   const [defaultSaved, setDefaultSaved]        = useState(false)
 
   const [user, setUser] = useState(null)
+  const editVideoIdRef = useRef(null)   // id Supabase de la vidéo en cours d'édition
+  const hasGeneratedRef = useRef(false) // true si on a lancé une génération → pas de draft au retour
 
   useEffect(() => {
     const init = async () => {
@@ -117,6 +119,7 @@ function StudioContent() {
       // ── Mode édition : charger la vidéo depuis Supabase ──
       if (storedVideoId) {
         setIsEditMode(true)
+        editVideoIdRef.current = storedVideoId
         const { data: vid } = await supabase
           .from('videos')
           .select('*')
@@ -195,6 +198,7 @@ function StudioContent() {
       })
       const data = await res.json()
       if (data.success) {
+        hasGeneratedRef.current = true
         setGenerated(true)
         setTimeout(() => router.push('/dashboard'), 2000)
       } else {
@@ -235,6 +239,49 @@ function StudioContent() {
     return matchLang && matchSearch
   })
 
+  const [savingDraft, setSavingDraft] = useState(false)
+
+  // ── Sauvegarde draft au retour ────────────────────────────
+  const handleBack = async () => {
+    // Si génération déjà lancée, retour direct
+    if (hasGeneratedRef.current) { router.push('/dashboard'); return }
+
+    // Si aucun script → retour direct sans sauvegarder
+    if (!script.trim()) { router.push('/dashboard'); return }
+
+    setSavingDraft(true)
+    try {
+      if (editVideoIdRef.current) {
+        // ── Mise à jour de la vidéo existante (mode édition) ──
+        await supabase.from('videos').update({
+          script:    script,
+          contenu:   script,
+          titre:     projectTitle,
+          avatar_id: selectedAvatar?.avatar_id || null,
+          voice_id:  selectedVoice?.voice_id   || null,
+          statut:    'script_pret',
+        }).eq('id', editVideoIdRef.current)
+      } else {
+        // ── Nouvelle vidéo → créer un draft ──
+        const { data: { user: u } } = await supabase.auth.getUser()
+        if (u) {
+          await supabase.from('videos').insert({
+            user_id:   u.id,
+            script:    script,
+            contenu:   script,
+            titre:     projectTitle || 'Brouillon Piloto Studio',
+            avatar_id: selectedAvatar?.avatar_id || null,
+            voice_id:  selectedVoice?.voice_id   || null,
+            statut:    'script_pret',
+          })
+        }
+      }
+    } catch (e) {
+      console.error('Erreur sauvegarde draft:', e)
+    }
+    router.push('/dashboard')
+  }
+
   const wordCount    = script.trim() ? script.trim().split(/\s+/).length : 0
   const estimatedMin = Math.ceil(wordCount / 130)
 
@@ -253,9 +300,12 @@ function StudioContent() {
       {/* ── TOP BAR ── */}
       <header className="h-12 border-b border-[#1a1a1a] flex items-center justify-between px-4 flex-shrink-0 bg-[#080808]">
         <div className="flex items-center gap-3">
-          <button onClick={() => router.push('/dashboard')}
-            className="w-7 h-7 rounded-lg bg-[#141414] hover:bg-[#1e1e1e] border border-[#222] flex items-center justify-center text-[#555] hover:text-white transition">
-            {I.arrowLeft}
+          <button onClick={handleBack}
+            className="w-7 h-7 rounded-lg bg-[#141414] hover:bg-[#1e1e1e] border border-[#222] flex items-center justify-center text-[#555] hover:text-white transition"
+            title="Retour (sauvegarde automatique)">
+            {savingDraft ? (
+              <div className="w-3 h-3 border border-[#c0392b]/40 border-t-[#c0392b] rounded-full animate-spin" />
+            ) : I.arrowLeft}
           </button>
           {/* Badge mode édition */}
           {isEditMode && (
