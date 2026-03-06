@@ -25,6 +25,7 @@ const Icon = {
   external: <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M5 2H2a1 1 0 00-1 1v7a1 1 0 001 1h7a1 1 0 001-1V7M7 1h4m0 0v4m0-4L5 7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
   mic: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="4.5" y="1" width="5" height="7" rx="2.5" stroke="currentColor" strokeWidth="1.3"/><path d="M2 7a5 5 0 0010 0M7 12v2" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>,
   close: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 2l10 10M12 2L2 12" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>,
+  download: <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>,
 }
 
 // ── Statut config ──────────────────────────────────────────
@@ -205,8 +206,6 @@ export default function Dashboard() {
       {/* MAIN */}
       <div className="ml-[220px] flex-1 min-h-screen">
         <div className="fade-in" key={activeTab + (nouvelleVideo ? '-new' : '')}>
-
-          {/* ── PAGE VIDÉOS ── */}
           {activeTab === 'videos' && !nouvelleVideo && (
             <MesVideos
               user={user}
@@ -214,8 +213,6 @@ export default function Dashboard() {
               onGoToParams={() => { setActiveTab('parametres'); setNouvelleVideo(false) }}
             />
           )}
-
-          {/* ── NOUVELLE VIDÉO (overlay dans la zone principale) ── */}
           {activeTab === 'videos' && nouvelleVideo && (
             <NouvelleVideo
               user={user}
@@ -223,7 +220,6 @@ export default function Dashboard() {
               onGoToParams={() => { setActiveTab('parametres'); setNouvelleVideo(false) }}
             />
           )}
-
           {activeTab === 'calendrier' && <Calendrier user={user} />}
           {activeTab === 'parametres' && <Parametres user={user} />}
         </div>
@@ -233,9 +229,6 @@ export default function Dashboard() {
 }
 
 // ── MES VIDÉOS ─────────────────────────────────────────────
-// Remplace UNIQUEMENT la fonction MesVideos dans ton dashboard
-// Les autres fonctions (NouvelleVideo, Calendrier, Parametres) restent identiques
-
 function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -247,8 +240,10 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [openMenuId, setOpenMenuId] = useState(null)
   const [renamingVideo, setRenamingVideo] = useState(null)
   const [renameValue, setRenameValue] = useState('')
+  // ── NOUVEAU : état pour le lecteur vidéo modal ──
+  const [playingVideo, setPlayingVideo] = useState(null) // { url, titre }
   const intervalRef = useRef(null)
-  const pollingRef = useRef({}) // { [videoId]: intervalId }
+  const pollingRef = useRef({})
 
   const fetchVideos = async () => {
     const { data } = await supabase
@@ -257,12 +252,10 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
       .order('created_at', { ascending: false })
     if (data) {
       setVideos(data)
-      // Démarrer le polling pour les vidéos en_cours
       data.forEach(v => {
         if (v.statut === 'video_en_cours' && v.heygen_video_id && !pollingRef.current[v.id]) {
           startPolling(v)
         }
-        // Arrêter le polling si la vidéo est terminée
         if (!['video_en_cours', 'generation_video'].includes(v.statut) && pollingRef.current[v.id]) {
           clearInterval(pollingRef.current[v.id])
           delete pollingRef.current[v.id]
@@ -272,15 +265,11 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     setLoading(false)
   }
 
-  // Polling HeyGen côté frontend — toutes les 15s
   const startPolling = async (video) => {
-    // Récupérer la clé HeyGen du profil
     const { data: profile } = await supabase
       .from('profiles').select('heygen_key').eq('id', user.id).single()
     const heygenKey = profile?.heygen_key
     if (!heygenKey) return
-
-    console.log(`🔄 Démarrage polling pour vidéo ${video.id}`)
 
     const pollId = setInterval(async () => {
       try {
@@ -294,31 +283,34 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           }),
         })
         const data = await res.json()
-        console.log(`Poll vidéo ${video.id} — statut HeyGen: ${data.status}`)
-
         if (data.status === 'completed' || data.status === 'failed') {
           clearInterval(pollingRef.current[video.id])
           delete pollingRef.current[video.id]
-          fetchVideos() // Rafraîchir la liste
+          fetchVideos()
         }
       } catch (err) {
         console.error('Polling error:', err)
       }
-    }, 15000) // toutes les 15 secondes
+    }, 15000)
 
     pollingRef.current[video.id] = pollId
   }
 
   useEffect(() => {
     fetchVideos()
-    // Refresh Supabase toutes les 10s (pour les autres statuts)
     intervalRef.current = setInterval(fetchVideos, 10000)
     return () => {
       clearInterval(intervalRef.current)
-      // Nettoyer tous les pollings actifs
       Object.values(pollingRef.current).forEach(clearInterval)
       pollingRef.current = {}
     }
+  }, [])
+
+  // Fermer menu si clic en dehors
+  useEffect(() => {
+    const handle = () => setOpenMenuId(null)
+    document.addEventListener('click', handle)
+    return () => document.removeEventListener('click', handle)
   }, [])
 
   const ouvrirEdit = (v) => { setEditingVideo(v); setEditTitre(v.titre || ''); setEditDescription(v.description || '') }
@@ -338,7 +330,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 
   const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret', 'upload_youtube'].includes(v.statut))
 
-  // ── Config visuelle par statut ──────────────────────────
   const getStatusOverlay = (statut) => {
     switch (statut) {
       case 'en_attente':
@@ -420,7 +411,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     return map[statut] || statut
   }
 
-  // ── Thumbnail placeholder animé ──────────────────────────
   const ThumbnailPlaceholder = ({ statut }) => {
     const overlay = getStatusOverlay(statut)
     return (
@@ -489,7 +479,49 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 
       <div className="px-10 py-8">
 
-        {/* Modal édition */}
+        {/* ── Modal lecteur vidéo ── */}
+        {playingVideo && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+            onClick={() => setPlayingVideo(null)}>
+            <div
+              className="relative w-full max-w-4xl mx-4"
+              onClick={e => e.stopPropagation()}>
+              {/* Header modal */}
+              <div className="flex items-center justify-between mb-3 px-1">
+                <p className="text-[13px] font-medium text-white truncate pr-4">{playingVideo.titre || 'Vidéo'}</p>
+                <button
+                  onClick={() => setPlayingVideo(null)}
+                  className="w-8 h-8 rounded-lg bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#666] hover:text-white transition flex-shrink-0">
+                  {Icon.close}
+                </button>
+              </div>
+              {/* Lecteur vidéo */}
+              <video
+                src={playingVideo.url}
+                controls
+                autoPlay
+                className="w-full rounded-xl border border-[#2a2a2a] bg-black shadow-2xl"
+                style={{ maxHeight: '72vh' }}
+              />
+              {/* Footer avec bouton télécharger */}
+              <div className="flex items-center justify-between mt-3 px-1">
+                <p className="text-[11px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                  Appuie sur Échap ou clique en dehors pour fermer
+                </p>
+                <a
+                  href={playingVideo.url}
+                  download
+                  onClick={e => e.stopPropagation()}
+                  className="flex items-center gap-2 text-[12px] text-[#555] hover:text-white border border-[#2a2a2a] hover:border-[#444] px-3 py-2 rounded-lg transition">
+                  {Icon.download} Télécharger
+                </a>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── Modal édition ── */}
         {editingVideo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="bg-[#0e0e0e] border border-[#222] rounded-2xl p-6 w-full max-w-md mx-4 space-y-4">
@@ -515,7 +547,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           </div>
         )}
 
-        {/* Modal renommer */}
+        {/* ── Modal renommer ── */}
         {renamingVideo && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
             <div className="bg-[#0e0e0e] border border-[#222] rounded-2xl p-6 w-full max-w-sm mx-4 space-y-4">
@@ -574,19 +606,26 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 
                   {/* Vignette 16/9 */}
                   <div className="relative rounded-t-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                    {/* Si vidéo prête : afficher le lecteur ou lien direct */}
+
+                    {/* ── VIDÉO PRÊTE : bouton play qui ouvre le lecteur modal ── */}
                     {isReady && v.thumbnail_url ? (
-                      <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                      <button
+                        onClick={() => setPlayingVideo({ url: v.thumbnail_url, titre: v.titre })}
+                        className="block w-full h-full group/play">
                         <div className="w-full h-full bg-[#0d0d0d] flex items-center justify-center relative">
                           <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent" />
                           <div className="relative flex flex-col items-center gap-2">
-                            <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
-                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M7 4l10 6-10 6V4Z" fill="#10b981"/></svg>
+                            <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center group-hover/play:bg-emerald-500/40 group-hover/play:scale-110 transition-all duration-200">
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                                <path d="M7 4l10 6-10 6V4Z" fill="#10b981"/>
+                              </svg>
                             </div>
-                            <span className="text-[10px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Voir la vidéo</span>
+                            <span className="text-[10px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
+                              Lire la vidéo
+                            </span>
                           </div>
                         </div>
-                      </a>
+                      </button>
                     ) : v.thumbnail_url ? (
                       <img src={v.thumbnail_url} alt={v.titre} className="w-full h-full object-cover" />
                     ) : (
@@ -664,18 +703,31 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                                 <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar Video</p>
                               </div>
 
+                              {/* Lire la vidéo */}
+                              {v.thumbnail_url ? (
+                                <button
+                                  onClick={() => { setPlayingVideo({ url: v.thumbnail_url, titre: v.titre }); setOpenMenuId(null) }}
+                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-emerald-400 hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer font-medium w-full text-left">
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 4.5l5 2.5-5 2.5V4.5Z" fill="currentColor"/></svg>
+                                  Lire la vidéo
+                                </button>
+                              ) : (
+                                <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 4.5l5 2.5-5 2.5V4.5Z" fill="currentColor"/></svg>
+                                  Vidéo en cours...
+                                </div>
+                              )}
+
                               {/* Télécharger */}
                               {v.thumbnail_url ? (
-                                <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
+                                <a href={v.thumbnail_url} download
                                   onClick={() => setOpenMenuId(null)}
-                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-emerald-400 hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer font-medium">
-                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Télécharger la vidéo
+                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
+                                  {Icon.download} Télécharger la vidéo
                                 </a>
                               ) : (
                                 <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
-                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Télécharger (en cours...)
+                                  {Icon.download} Télécharger (en cours...)
                                 </div>
                               )}
 
@@ -734,28 +786,22 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 }
 
 // ── NOUVELLE VIDÉO ─────────────────────────────────────────
-// Flux simplifié : Script → Avatar → Publication (pas d'étapes visibles)
-// ── NOUVELLE VIDÉO ─────────────────────────────────────────
 function NouvelleVideo({ user, onBack, onGoToParams }) {
-  // étapes: 'choix' | 'analyse' | 'suggestions' | 'script_pret' | 'avatar' | 'confirmation'
   const router = useRouter()
   const [etape, setEtape] = useState('choix')
 
-  // Script flow
-  const [scriptBrut, setScriptBrut] = useState('')        // script collé par l'user
+  const [scriptBrut, setScriptBrut] = useState('')
   const [analysing, setAnalysing]   = useState(false)
-  const [suggestions, setSuggestions] = useState(null)     // { niche, tone, audience, titre_suggere, resume }
-  const [scriptGenere, setScriptGenere] = useState('')     // script final généré par IA
+  const [suggestions, setSuggestions] = useState(null)
+  const [scriptGenere, setScriptGenere] = useState('')
   const [generatingScript, setGeneratingScript] = useState(false)
-  const [contenu, setContenu] = useState('')               // script final utilisé pour la vidéo
+  const [contenu, setContenu] = useState('')
 
-  // Config IA
   const [niche, setNiche]     = useState('')
   const [tone, setTone]       = useState('')
   const [audience, setAudience] = useState('')
   const [longueur, setLongueur] = useState('medium')
 
-  // Heygen
   const [heygenKey, setHeygenKey]   = useState('')
   const [avatarId, setAvatarId]     = useState('')
   const [voiceId, setVoiceId]       = useState('')
@@ -768,7 +814,6 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
   const [selectedAvatarObj, setSelectedAvatarObj] = useState(null)
   const [selectedVoiceObj, setSelectedVoiceObj]   = useState(null)
 
-  // Publication
   const [titre, setTitre]         = useState('')
   const [description, setDescription] = useState('')
   const [loading, setLoading]     = useState(false)
@@ -804,7 +849,6 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
     init()
   }, [])
 
-  // ── Analyser le script avec l'IA ──────────────────────────
   const analyserScript = async () => {
     if (!scriptBrut.trim()) return
     setAnalysing(true)
@@ -854,7 +898,6 @@ ${scriptBrut.substring(0, 3000)}`
     setAnalysing(false)
   }
 
-  // ── Générer le script amélioré ──────────────────────────────
   const genererScript = async () => {
     setGeneratingScript(true)
     setEtape('script_pret')
@@ -941,7 +984,13 @@ ${scriptBrut}`
     <div>
       <PageHeader
         title="Nouvelle vidéo"
-        sub={etape === 'choix' ? 'Tu as déjà un script ou tu veux en générer un ?' : etape === 'analyse' ? 'Analyse en cours...' : etape === 'suggestions' ? 'Confirme les suggestions IA' : etape === 'script_pret' ? 'Script optimisé prêt' : etape === 'avatar' ? 'Choisis ton avatar' : 'Prêt à générer'}
+        sub={
+          etape === 'choix' ? 'Tu as déjà un script ou tu veux en générer un ?' :
+          etape === 'analyse' ? 'Analyse en cours...' :
+          etape === 'suggestions' ? 'Confirme les suggestions IA' :
+          etape === 'script_pret' ? 'Script optimisé prêt' :
+          etape === 'avatar' ? 'Choisis ton avatar' : 'Prêt à générer'
+        }
         action={
           <button onClick={onBack} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition border border-[#1e1e1e] hover:border-[#333] px-3.5 py-2 rounded-lg">
             {Icon.arrowLeft} Retour
@@ -951,10 +1000,9 @@ ${scriptBrut}`
 
       <div className="px-10 py-8 max-w-[680px]">
 
-        {/* ── ÉTAPE 0 : CHOIX ── */}
+        {/* ── ÉTAPE CHOIX ── */}
         {etape === 'choix' && (
           <div className="space-y-3">
-            {/* Option A — Générer avec IA */}
             <button
               onClick={() => setEtape('saisie')}
               className="w-full flex items-center gap-4 px-5 py-5 bg-[#0d0d0d] border border-[#1e1e1e] hover:border-[#c0392b]/40 hover:bg-[#c0392b]/5 rounded-xl transition-all text-left group">
@@ -968,7 +1016,6 @@ ${scriptBrut}`
               <span className="text-[#333] group-hover:text-[#c0392b] group-hover:translate-x-0.5 transition-all">{Icon.arrow}</span>
             </button>
 
-            {/* Option B — Script prêt → Piloto Studio direct */}
             <button
               onClick={() => setEtape('script_direct')}
               className="w-full flex items-center gap-4 px-5 py-5 bg-[#0d0d0d] border border-[#1e1e1e] hover:border-[#2a2a2a] hover:bg-[#111] rounded-xl transition-all text-left group">
@@ -984,7 +1031,7 @@ ${scriptBrut}`
           </div>
         )}
 
-        {/* ── ÉTAPE SAISIE (IA flow) ── */}
+        {/* ── ÉTAPE SAISIE ── */}
         {etape === 'saisie' && (
           <div className="space-y-4">
             <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
@@ -1011,35 +1058,13 @@ ${scriptBrut}`
                 </button>
               </div>
             </div>
-
-            {/* Pipeline visuel */}
-            <div className="flex items-center justify-center gap-3 py-3">
-              {[
-                { icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 3h10M2 6h7M2 9h8M2 12h5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, label: 'Votre Script' },
-                { icon: <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="4" stroke="currentColor" strokeWidth="1.2"/><path d="M9.5 4.5l-4 4M4.5 4.5l4 4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>, label: 'Analyse IA' },
-                { icon: Icon.spark, label: 'Script Viral' },
-              ].map((step, i, arr) => (
-                <div key={step.label} className="flex items-center gap-3">
-                  <div className="flex flex-col items-center gap-1.5">
-                    <div className={`w-9 h-9 rounded-xl flex items-center justify-center ${i === 0 ? 'bg-[#1e1e1e] text-[#888]' : i === 1 ? 'bg-amber-500/20 text-amber-400' : 'bg-[#c0392b]/20 text-[#c0392b]'}`}>
-                      {step.icon}
-                    </div>
-                    <span className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>{step.label}</span>
-                  </div>
-                  {i < arr.length - 1 && (
-                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" className="text-[#222] mb-4"><path d="M4 8h8M9 5l3 3-3 3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                  )}
-                </div>
-              ))}
-            </div>
-
             <button onClick={() => setEtape('choix')} className="flex items-center gap-2 text-[12px] text-[#444] hover:text-white transition">
               {Icon.arrowLeft} Retour
             </button>
           </div>
         )}
 
-        {/* ── ÉTAPE ANALYSE (spinner) ── */}
+        {/* ── ÉTAPE ANALYSE ── */}
         {etape === 'analyse' && (
           <div className="flex flex-col items-center gap-6 py-20">
             <div className="relative">
@@ -1065,13 +1090,11 @@ ${scriptBrut}`
         {/* ── ÉTAPE SUGGESTIONS ── */}
         {etape === 'suggestions' && suggestions && (
           <div className="space-y-5">
-            {/* Badge auto-detected */}
             <div className="flex items-center gap-2 px-3.5 py-2.5 bg-[#c0392b]/8 border border-[#c0392b]/20 rounded-xl">
               <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="text-[#c0392b] flex-shrink-0"><path d="M6.5 1L8 5H12L8.8 7.4 10 11.5 6.5 9.2 3 11.5l1.2-4.1L1 5h4L6.5 1Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
               <span className="text-[11px] text-[#c0392b] tracking-widest uppercase font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Auto-détecté — confirme ou ajuste</span>
             </div>
 
-            {/* Titre suggéré */}
             {suggestions.titre_suggere && (
               <div className="border border-[#c0392b]/30 bg-[#c0392b]/5 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
@@ -1084,7 +1107,6 @@ ${scriptBrut}`
               </div>
             )}
 
-            {/* Niche */}
             <div>
               <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Niche</p>
               <div className="flex flex-wrap gap-2">
@@ -1098,7 +1120,6 @@ ${scriptBrut}`
               </div>
             </div>
 
-            {/* Ton */}
             <div>
               <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Ton</p>
               <div className="grid grid-cols-2 gap-2">
@@ -1112,7 +1133,6 @@ ${scriptBrut}`
               </div>
             </div>
 
-            {/* Audience */}
             <div>
               <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Audience cible</p>
               <div className="flex flex-wrap gap-2">
@@ -1126,7 +1146,6 @@ ${scriptBrut}`
               </div>
             </div>
 
-            {/* Longueur */}
             <div>
               <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Longueur du script</p>
               <div className="grid grid-cols-3 gap-2">
@@ -1181,7 +1200,6 @@ ${scriptBrut}`
               </div>
             ) : (
               <>
-                {/* Header script ready */}
                 <div className="flex items-center justify-between px-4 py-3 bg-emerald-500/8 border border-emerald-500/20 rounded-xl">
                   <div className="flex items-center gap-2.5">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-emerald-400"><path d="M2 7l4 4 6-6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
@@ -1198,7 +1216,6 @@ ${scriptBrut}`
                   </button>
                 </div>
 
-                {/* Script content */}
                 <div className="relative border border-[#1a1a1a] rounded-xl overflow-hidden">
                   <textarea
                     value={scriptGenere}
@@ -1209,7 +1226,6 @@ ${scriptBrut}`
                   />
                 </div>
 
-                {/* CTA principal — Aller dans Piloto Studio */}
                 <button
                   onClick={() => {
                     setContenu(scriptGenere)
@@ -1238,7 +1254,7 @@ ${scriptBrut}`
           </div>
         )}
 
-        {/* ── ÉTAPE SCRIPT DIRECT (déjà un script) ── */}
+        {/* ── ÉTAPE SCRIPT DIRECT ── */}
         {etape === 'script_direct' && (
           <div className="space-y-4">
             <Field label="Ton script final">
