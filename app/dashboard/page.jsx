@@ -199,7 +199,7 @@ export default function Dashboard() {
 
   const nav = [
     { id: 'videos',     label: 'Vidéos',     icon: Icon.grid },
-    { id: 'voix_off', label: 'Voix off', icon: Icon.mic },
+    { id: 'voix_off',   label: 'Voix off',   icon: Icon.mic },
     { id: 'parametres', label: 'Paramètres', icon: Icon.settings },
   ]
 
@@ -298,7 +298,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [renamingVideo, setRenamingVideo] = useState(null)
   const [renameValue, setRenameValue] = useState('')
   const [playingVideo, setPlayingVideo] = useState(null)
-  // ── Ticker pour forcer re-render du temps écoulé chaque minute ──
   const [tick, setTick] = useState(0)
   const intervalRef = useRef(null)
   const pollingRef = useRef({})
@@ -358,7 +357,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   useEffect(() => {
     fetchVideos()
     intervalRef.current = setInterval(fetchVideos, 10000)
-    // Ticker pour rafraîchir le temps écoulé toutes les 30s
     tickRef.current = setInterval(() => setTick(t => t + 1), 30000)
     return () => {
       clearInterval(intervalRef.current)
@@ -391,7 +389,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 
   const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret', 'upload_youtube'].includes(v.statut))
 
-  // ── Vérifie si une vidéo est en cours de génération (non éditable) ──
   const isEnCours = (v) => STATUTS_EN_COURS.includes(v.statut)
 
   const getStatusOverlay = (statut) => {
@@ -429,7 +426,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
         }
       case 'video_en_cours':
         return {
-          label: 'Piloto génère...', // ← MODIFIÉ
+          label: 'Piloto génère...',
           icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M8 5v3l2 2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
           bg: 'bg-amber-500/20 border-amber-500/30',
           dot: 'bg-amber-400',
@@ -469,7 +466,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const getStatusLabel = (statut) => {
     const map = {
       en_attente: 'En attente', generation_script: 'Script IA', script_pret: 'Draft',
-      generation_video: 'Envoi...', video_en_cours: 'Piloto', upload_youtube: 'Prête ✓', // ← MODIFIÉ
+      generation_video: 'Envoi...', video_en_cours: 'Piloto', upload_youtube: 'Prête ✓',
       publiee: 'Publiée', programmee: 'Programmée', erreur: 'Erreur',
     }
     return map[statut] || statut
@@ -658,7 +655,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                   <p className="text-[10px] text-[#555] truncate" style={{ fontFamily: "'DM Mono', monospace" }}>{v.titre || 'Vidéo'}</p>
                 </div>
 
-                {/* ── Éditer dans Studio — désactivé si en cours ── */}
                 {enCours ? (
                   <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
                     {Icon.lock}
@@ -764,7 +760,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
               return (
                 <div key={v.id} className="group relative flex flex-col rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40">
 
-                  {/* Vignette 16/9 */}
                   <div className="relative rounded-t-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
 
                     {isReady && v.thumbnail_url ? (
@@ -785,7 +780,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                             </svg>
                           </div>
                         </div>
-                        {/* Badge durée style YouTube */}
                         <VideoDurationBadge src={v.thumbnail_url} />
                       </button>
                     ) : v.thumbnail_url ? (
@@ -794,7 +788,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       <ThumbnailPlaceholder statut={v.statut} />
                     )}
 
-                    {/* Overlay statut actif */}
                     {isActive && (
                       <div className={`absolute inset-0 border flex items-center justify-center ${overlay.bg}`}>
                         <div className="bg-black/60 backdrop-blur-sm rounded-xl px-3.5 py-2 flex items-center gap-2 shadow-lg">
@@ -817,7 +810,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Bouton crayon — désactivé si en cours */}
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       {enCours ? (
                         <div
@@ -844,13 +836,11 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                     </div>
                   </div>
 
-                  {/* Infos bas de card */}
                   <div className="px-3 py-2.5 flex flex-col gap-1.5 flex-1">
                     <p className="text-[12px] font-medium text-white leading-snug line-clamp-2" style={{ minHeight: '34px' }}>
                       {v.titre || <span className="text-[#2a2a2a] italic font-normal">Titre en génération...</span>}
                     </p>
                     <div className="flex items-center justify-between mt-auto pt-1">
-                      {/* ── TEMPS ÉCOULÉ au lieu de la date ── */}
                       <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
                         {timeAgo(v.created_at)}
                       </span>
@@ -861,7 +851,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                           {getStatusLabel(v.statut)}
                         </span>
 
-                        {/* Menu "..." */}
                         <button
                           onClick={e => {
                             e.stopPropagation()
@@ -923,11 +912,9 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
   const [description, setDescription] = useState('')
   const [loading, setLoading]     = useState(false)
 
-  // ── Sauvegarde draft au retour ────────────────────────────
   const savingDraftRef = useRef(false)
 
   const handleBack = async () => {
-    // Si un script a été saisi/généré sans lancer la génération → sauvegarder en draft
     const scriptToSave = contenu || scriptGenere || scriptBrut
     if (scriptToSave.trim() && !savingDraftRef.current) {
       savingDraftRef.current = true
@@ -938,7 +925,7 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
             user_id: u.id,
             titre: titre || 'Brouillon sans titre',
             script: scriptToSave,
-            statut: 'script_pret', // = draft
+            statut: 'script_pret',
           })
         }
       } catch (e) { console.error('Erreur sauvegarde draft:', e) }
@@ -1080,7 +1067,7 @@ ${scriptBrut}`
   }
 
   const lancerGeneration = async () => {
-    savingDraftRef.current = true // marquer pour ne pas re-sauvegarder en draft
+    savingDraftRef.current = true
     setLoading(true)
     try {
       const { data: { user: u } } = await supabase.auth.getUser()
@@ -1230,7 +1217,7 @@ ${scriptBrut}`
             {suggestions.titre_suggere && (
               <div className="border border-[#c0392b]/30 bg-[#c0392b]/5 rounded-xl p-4">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-[#c0392b] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Titre suggéré · {suggestions.langue}</span>
+                  <span className="text-[10px] text-[#c0392b] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Titre suggéré · {suggestions.langue}</span>
                   <button onClick={() => setTitre(suggestions.titre_suggere)} className="text-[10px] text-[#c0392b] hover:text-white transition border border-[#c0392b]/30 hover:border-[#c0392b] px-2 py-1 rounded-lg">
                     Utiliser
                   </button>
@@ -1240,7 +1227,7 @@ ${scriptBrut}`
             )}
 
             <div>
-              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Niche</p>
+              <p className="text-[11px] text-[#444] tracking-widests uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Niche</p>
               <div className="flex flex-wrap gap-2">
                 {niches.map(n => (
                   <button key={n} onClick={() => setNiche(n)}
@@ -1266,7 +1253,7 @@ ${scriptBrut}`
             </div>
 
             <div>
-              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Audience cible</p>
+              <p className="text-[11px] text-[#444] tracking-widests uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Audience cible</p>
               <div className="flex flex-wrap gap-2">
                 {audiences.map(a => (
                   <button key={a} onClick={() => setAudience(a)}
@@ -1279,7 +1266,7 @@ ${scriptBrut}`
             </div>
 
             <div>
-              <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Longueur du script</p>
+              <p className="text-[11px] text-[#444] tracking-widests uppercase mb-2.5" style={{ fontFamily: "'DM Mono', monospace" }}>Longueur du script</p>
               <div className="grid grid-cols-3 gap-2">
                 {[
                   { key: 'short',  label: 'Court',  detail: '3-5 min',   chars: '1k-5k' },
@@ -1458,11 +1445,11 @@ ${scriptBrut}`
             {avatars.length > 0 && (
               <div className="flex gap-5">
                 <div className="flex-1 min-w-0">
-                  <p className="text-[11px] text-[#444] tracking-widest uppercase mb-3" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar</p>
+                  <p className="text-[11px] text-[#444] tracking-widests uppercase mb-3" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar</p>
                   <input type="text" value={avatarSearch} onChange={e => setAvatarSearch(e.target.value)} className={`${inputCls} mb-3 text-[12px]`} placeholder="Rechercher..." />
                   {avatars.filter(a => a.type === 'personal').length > 0 && (
                     <div className="mb-3">
-                      <p className="text-[10px] text-[#c0392b] tracking-widest uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>✦ Mes avatars</p>
+                      <p className="text-[10px] text-[#c0392b] tracking-widests uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>✦ Mes avatars</p>
                       <div className="grid grid-cols-2 gap-2">
                         {avatars.filter(a => a.type === 'personal' && (!avatarSearch || a.avatar_name?.toLowerCase().includes(avatarSearch.toLowerCase()))).map(avatar => (
                           <AvatarCard key={avatar.avatar_id} avatar={avatar} selected={avatarId === avatar.avatar_id} onSelect={() => { setAvatarId(avatar.avatar_id); setSelectedAvatarObj(avatar) }} />
@@ -1470,7 +1457,7 @@ ${scriptBrut}`
                       </div>
                     </div>
                   )}
-                  <p className="text-[10px] text-[#333] tracking-widest uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>Bibliothèque</p>
+                  <p className="text-[10px] text-[#333] tracking-widests uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>Bibliothèque</p>
                   <div className="grid grid-cols-2 gap-2 overflow-y-auto pr-1" style={{ maxHeight: '420px' }}>
                     {avatars.filter(a => a.type !== 'personal' && (!avatarSearch || a.avatar_name?.toLowerCase().includes(avatarSearch.toLowerCase()))).map(avatar => (
                       <AvatarCard key={avatar.avatar_id} avatar={avatar} selected={avatarId === avatar.avatar_id} onSelect={() => { setAvatarId(avatar.avatar_id); setSelectedAvatarObj(avatar) }} />
@@ -1494,7 +1481,7 @@ ${scriptBrut}`
                   )}
                   {voices.length > 0 && (
                     <div>
-                      <p className="text-[11px] text-[#444] tracking-widest uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>Voix</p>
+                      <p className="text-[11px] text-[#444] tracking-widests uppercase mb-2" style={{ fontFamily: "'DM Mono', monospace" }}>Voix</p>
                       <div className="flex gap-1.5 flex-wrap mb-2">
                         {[{ key:'fr', label:'🇫🇷' }, { key:'en', label:'🇺🇸' }, { key:'es', label:'🇪🇸' }, { key:'all', label:'🌍' }].map(f => (
                           <button key={f.key} onClick={() => setVoiceFilter(f.key)} className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${voiceFilter === f.key ? 'border-[#c0392b] bg-[#c0392b]/10 text-[#c0392b]' : 'border-[#1e1e1e] text-[#555] hover:border-[#2a2a2a]'}`}>{f.label}</button>
@@ -1509,7 +1496,7 @@ ${scriptBrut}`
                               <p className="text-[11px] font-medium text-[#bbb] truncate">{voice.name}</p>
                               <p className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>{voice.language || voice.locale}</p>
                             </div>
-                            {voiceId === voice.voice_id && <div className="w-3.5 h-3.5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0"><svg width="7" height="7" viewBox="0 0 7 7" fill="none"><path d="M1 3.5L2.5 5 6 1.5" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg></div>}
+                            {voiceId === voice.voice_id && <div className="w-3.5 h-3.5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0">{Icon.check}</div>}
                           </button>
                         ))}
                       </div>
@@ -1538,7 +1525,7 @@ ${scriptBrut}`
             </div>
             <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
               <div className="px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
-                <span className="text-[11px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Récapitulatif</span>
+                <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Récapitulatif</span>
               </div>
               <div className="divide-y divide-[#111]">
                 {[
@@ -1577,42 +1564,301 @@ ${scriptBrut}`
   )
 }
 
-// ── CALENDRIER ─────────────────────────────────────────────
-function Calendrier({ user }) {
-  const [videos, setVideos] = useState([])
+// ── VOIX OFF ───────────────────────────────────────────────
+function VoixOff({ user }) {
+  const [script, setScript]               = useState('')
+  const [voices, setVoices]               = useState([])
+  const [voiceId, setVoiceId]             = useState('')
+  const [selectedVoice, setSelectedVoice] = useState(null)
+  const [voiceFilter, setVoiceFilter]     = useState('fr')
+  const [loadingVoices, setLoadingVoices] = useState(false)
+  const [generating, setGenerating]       = useState(false)
+  const [audioUrl, setAudioUrl]           = useState(null)
+  const [error, setError]                 = useState('')
+  const [heygenKey, setHeygenKey]         = useState('')
+  const [speed, setSpeed]                 = useState(1.0)
+  const [pitch, setPitch]                 = useState(0)
 
   useEffect(() => {
-    supabase.from('videos').select('*')
-      .eq('user_id', user.id)
-      .eq('statut', 'programmee')
-      .order('date_publication', { ascending: true })
-      .then(({ data }) => { if (data) setVideos(data) })
+    const init = async () => {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('heygen_key, default_voice_id, default_voice_name')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile?.heygen_key) return
+      setHeygenKey(profile.heygen_key)
+
+      if (profile.default_voice_id) {
+        setVoiceId(profile.default_voice_id)
+        setSelectedVoice({ voice_id: profile.default_voice_id, name: profile.default_voice_name })
+      }
+
+      setLoadingVoices(true)
+      try {
+        const res = await fetch('/api/heygen/avatars-voices', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ heygenKey: profile.heygen_key }),
+        })
+        const data = await res.json()
+        if (data.voices) setVoices(data.voices)
+      } catch (e) { console.error(e) }
+      setLoadingVoices(false)
+    }
+    init()
   }, [])
+
+  const filteredVoices = voices.filter(v => {
+    if (voiceFilter === 'all') return true
+    return v.language?.toLowerCase().includes(voiceFilter) ||
+           v.locale?.toLowerCase().includes(voiceFilter)
+  })
+
+  const generer = async () => {
+    if (!script.trim() || !voiceId) return
+    setGenerating(true)
+    setError('')
+    setAudioUrl(null)
+    try {
+      const res = await fetch('/api/heygen/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ heygenKey, voiceId, script, speed, pitch }),
+      })
+      const data = await res.json()
+      if (data.error) { setError(data.error); setGenerating(false); return }
+      if (data.audioUrl) setAudioUrl(data.audioUrl)
+      else setError('Aucun audio reçu.')
+    } catch (e) { setError('Erreur : ' + e.message) }
+    setGenerating(false)
+  }
+
+  const wordCount  = script.trim() ? script.trim().split(/\s+/).length : 0
+  const estMinutes = wordCount > 0 ? Math.ceil(wordCount / 130) : 0
 
   return (
     <div>
-      <PageHeader title="Calendrier" sub="Publications programmées à venir." />
-      <div className="px-10 py-8">
-        {videos.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-20 border border-dashed border-[#1a1a1a] rounded-xl">
-            <div className="w-12 h-12 rounded-xl border border-[#1e1e1e] flex items-center justify-center text-[#2a2a2a]">{Icon.calendar}</div>
-            <p className="text-[13px] text-[#333]">Aucune publication programmée</p>
-          </div>
-        ) : (
-          <div className="space-y-2">
-            {videos.map(v => (
-              <div key={v.id} className="flex items-center justify-between px-5 py-4 border border-[#1a1a1a] rounded-xl bg-[#080808]">
-                <div>
-                  <p className="text-[13px] font-medium text-white">{v.titre}</p>
-                  <p className="text-[11px] text-[#444] mt-0.5" style={{ fontFamily: "'DM Mono', monospace" }}>{v.channel_id}</p>
-                </div>
-                <p className="text-[12px] text-sky-400" style={{ fontFamily: "'DM Mono', monospace" }}>
-                  {new Date(v.date_publication).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                </p>
-              </div>
-            ))}
+      <PageHeader
+        title="Voix off"
+        sub="Transforme ton script en audio IA avec HeyGen TTS."
+      />
+
+      <div className="px-10 py-8 max-w-[860px]">
+
+        {!heygenKey && (
+          <div className="flex items-center gap-3 px-4 py-3.5 bg-amber-500/8 border border-amber-500/20 rounded-xl mb-6">
+            <svg width="15" height="15" viewBox="0 0 15 15" fill="none" className="text-amber-400 flex-shrink-0">
+              <circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/>
+              <path d="M7.5 5v3.5M7.5 10v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+            </svg>
+            <p className="text-[12px] text-amber-400">
+              Configure ta clé HeyGen dans les <strong>Paramètres</strong> pour accéder aux voix.
+            </p>
           </div>
         )}
+
+        <div className="flex gap-6">
+
+          {/* ── Colonne gauche ── */}
+          <div className="flex-1 min-w-0 space-y-4">
+
+            <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
+              <div className="flex items-center gap-2.5 px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
+                {Icon.text}
+                <span className="text-[11px] text-[#555] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>
+                  Script à lire
+                </span>
+                {wordCount > 0 && (
+                  <span className="ml-auto text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    {wordCount} mots · ~{estMinutes} min
+                  </span>
+                )}
+              </div>
+              <textarea
+                value={script}
+                onChange={e => setScript(e.target.value)}
+                className="w-full bg-[#0d0d0d] px-4 py-4 text-[13px] text-white placeholder-[#2a2a2a] focus:outline-none resize-none"
+                rows={13}
+                placeholder="Entre le texte à transformer en voix off..."
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div className="border border-[#1a1a1a] rounded-xl p-4 bg-[#0a0a0a]">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Vitesse</span>
+                  <span className="text-[11px] text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{speed.toFixed(1)}x</span>
+                </div>
+                <input type="range" min="0.5" max="2.0" step="0.1" value={speed}
+                  onChange={e => setSpeed(parseFloat(e.target.value))}
+                  className="w-full accent-[#c0392b] cursor-pointer" />
+                <div className="flex justify-between mt-1.5">
+                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Lent 0.5x</span>
+                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Rapide 2x</span>
+                </div>
+              </div>
+              <div className="border border-[#1a1a1a] rounded-xl p-4 bg-[#0a0a0a]">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Pitch</span>
+                  <span className="text-[11px] text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{pitch > 0 ? `+${pitch}` : pitch}</span>
+                </div>
+                <input type="range" min="-10" max="10" step="1" value={pitch}
+                  onChange={e => setPitch(parseInt(e.target.value))}
+                  className="w-full accent-[#c0392b] cursor-pointer" />
+                <div className="flex justify-between mt-1.5">
+                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Grave -10</span>
+                  <span className="text-[9px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>Aigu +10</span>
+                </div>
+              </div>
+            </div>
+
+            {error && (
+              <div className="px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-xl">
+                <p className="text-[12px] text-red-400">{error}</p>
+              </div>
+            )}
+
+            <button
+              onClick={generer}
+              disabled={generating || !script.trim() || !voiceId}
+              className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-all group">
+              <div className="flex items-center gap-3">
+                <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                  {generating
+                    ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                    : Icon.mic
+                  }
+                </div>
+                <div className="text-left">
+                  <p className="text-[13px] font-semibold text-white">
+                    {generating ? 'Génération en cours...' : 'Générer la voix off'}
+                  </p>
+                  <p className="text-[11px] text-white/60">
+                    {voiceId
+                      ? `HeyGen TTS · ${selectedVoice?.name || voiceId}`
+                      : 'Sélectionne une voix à droite'
+                    }
+                  </p>
+                </div>
+              </div>
+              {!generating && (
+                <span className="text-white/70 group-hover:translate-x-0.5 transition-transform">{Icon.arrow}</span>
+              )}
+            </button>
+
+            {audioUrl && (
+              <div className="border border-emerald-500/25 bg-emerald-500/5 rounded-xl overflow-hidden">
+                <div className="flex items-center gap-2.5 px-4 py-3 border-b border-emerald-500/15">
+                  <svg width="13" height="13" viewBox="0 0 13 13" fill="none" className="text-emerald-400">
+                    <path d="M2 4l3.5 2-3.5 2V4Z" fill="currentColor"/>
+                    <path d="M8 3.5v6M10.5 5v3" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/>
+                  </svg>
+                  <span className="text-[11px] text-emerald-400 tracking-widests uppercase font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    Audio généré ✓
+                  </span>
+                </div>
+                <div className="p-4 space-y-3">
+                  <audio src={audioUrl} controls className="w-full" style={{ height: '40px' }} />
+                  <a
+                    href={audioUrl}
+                    download="voix-off-piloto.mp3"
+                    className="flex items-center justify-center gap-2 py-2.5 text-[12px] text-[#888] hover:text-white border border-[#222] hover:border-[#333] rounded-lg transition w-full">
+                    {Icon.download} Télécharger l'audio
+                  </a>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* ── Colonne droite : sélecteur voix ── */}
+          <div style={{ width: '240px', flexShrink: 0 }}>
+            <div className="border border-[#1a1a1a] rounded-xl overflow-hidden bg-[#0a0a0a] sticky top-6">
+              <div className="px-3.5 py-3 border-b border-[#1a1a1a] flex items-center justify-between">
+                <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>
+                  Voix
+                </span>
+                {voices.length > 0 && (
+                  <span className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                    {filteredVoices.length}/{voices.length}
+                  </span>
+                )}
+              </div>
+              <div className="p-3 space-y-2.5">
+
+                {selectedVoice && (
+                  <div className="flex items-center gap-2 px-3 py-2 bg-[#c0392b]/8 border border-[#c0392b]/20 rounded-lg">
+                    <span className="text-[#c0392b]">{Icon.mic}</span>
+                    <p className="text-[11px] text-[#c0392b] font-medium truncate">{selectedVoice.name}</p>
+                  </div>
+                )}
+
+                <div className="flex gap-1.5 flex-wrap">
+                  {[
+                    { key: 'fr', label: '🇫🇷' },
+                    { key: 'en', label: '🇺🇸' },
+                    { key: 'es', label: '🇪🇸' },
+                    { key: 'all', label: '🌍' },
+                  ].map(f => (
+                    <button key={f.key} onClick={() => setVoiceFilter(f.key)}
+                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${
+                        voiceFilter === f.key
+                          ? 'border-[#c0392b] bg-[#c0392b]/10 text-[#c0392b]'
+                          : 'border-[#1e1e1e] text-[#555] hover:border-[#2a2a2a]'
+                      }`}>
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+
+                {loadingVoices && (
+                  <div className="flex items-center justify-center gap-2 py-8">
+                    <div className="w-3.5 h-3.5 border-2 border-[#c0392b]/30 border-t-[#c0392b] rounded-full animate-spin" />
+                    <span className="text-[11px] text-[#444]">Chargement...</span>
+                  </div>
+                )}
+
+                {!loadingVoices && voices.length === 0 && (
+                  <div className="py-10 flex flex-col items-center gap-2 text-center">
+                    <span className="text-2xl text-[#1a1a1a]">🎙️</span>
+                    <p className="text-[11px] text-[#333]">Aucune voix — configure ta clé HeyGen dans Paramètres</p>
+                  </div>
+                )}
+
+                <div className="space-y-1 overflow-y-auto" style={{ maxHeight: '500px' }}>
+                  {filteredVoices.slice(0, 80).map(voice => (
+                    <button key={voice.voice_id}
+                      onClick={() => { setVoiceId(voice.voice_id); setSelectedVoice(voice) }}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg border text-left transition ${
+                        voiceId === voice.voice_id
+                          ? 'border-[#c0392b] bg-[#c0392b]/8'
+                          : 'border-[#1a1a1a] bg-[#0d0d0d] hover:border-[#2a2a2a]'
+                      }`}>
+                      <div className={`w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0 ${
+                        voiceId === voice.voice_id ? 'bg-[#c0392b]/20 text-[#c0392b]' : 'bg-[#161616] text-[#333]'
+                      }`}>
+                        {Icon.mic}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-medium text-[#bbb] truncate">{voice.name}</p>
+                        <p className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                          {voice.language || voice.locale}
+                        </p>
+                      </div>
+                      {voiceId === voice.voice_id && (
+                        <div className="w-3.5 h-3.5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0">
+                          {Icon.check}
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   )
@@ -1712,7 +1958,7 @@ function Parametres({ user }) {
   const Section = ({ title, children }) => (
     <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
       <div className="px-5 py-3.5 border-b border-[#1a1a1a] bg-[#0a0a0a]">
-        <span className="text-[11px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>{title}</span>
+        <span className="text-[11px] text-[#444] tracking-widests uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>{title}</span>
       </div>
       <div className="p-5 space-y-4">{children}</div>
     </div>
