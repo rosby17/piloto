@@ -86,14 +86,18 @@ function StudioContent() {
   const [defaultSaved, setDefaultSaved]        = useState(false)
 
   const [user, setUser] = useState(null)
-  const editVideoIdRef = useRef(null)   // id Supabase de la vidéo en cours d'édition
-  const hasGeneratedRef = useRef(false) // true si on a lancé une génération → pas de draft au retour
+  const editVideoIdRef  = useRef(null)   // id Supabase de la vidéo en cours d'édition
+  const hasGeneratedRef = useRef(false)  // true si on a lancé une génération → pas de draft au retour
+  const autoSaveTimer   = useRef(null)   // debounce timer pour l'auto-save
+  const lastSavedScript = useRef('')     // dernier script sauvegardé (évite les saves inutiles)
+  const userRef         = useRef(null)   // ref vers user pour accès dans les callbacks
 
   useEffect(() => {
     const init = async () => {
       const { data: { user: u } } = await supabase.auth.getUser()
       if (!u) { router.push('/login'); return }
       setUser(u)
+      userRef.current = u
 
       // ── Lire TOUT le sessionStorage d'abord, puis vider ──
       const storedScript   = sessionStorage.getItem('piloto_studio_script')   || ''
@@ -240,45 +244,85 @@ function StudioContent() {
   })
 
   const [savingDraft, setSavingDraft] = useState(false)
+  const [autoSaveStatus, setAutoSaveStatus] = useState(null) // null | 'saving' | 'saved' | 'error'
 
-  // ── Sauvegarde draft au retour ────────────────────────────
-  const handleBack = async () => {
-    // Si génération déjà lancée, retour direct
-    if (hasGeneratedRef.current) { router.push('/dashboard'); return }
+  // ── Sauvegarde core — récupère le user si nécessaire ──────
+  const saveDraftNow = async (scriptVal, titleVal, avatarVal, voiceVal) => {
+    if (!scriptVal?.trim()) return false
+    if (hasGeneratedRef.current) return false
 
-    // Si aucun script → retour direct sans sauvegarder
-    if (!script.trim()) { router.push('/dashboard'); return }
+    // Récupérer le user directement depuis Supabase (pas de dépendance au state)
+    let uid = userRef.current?.id
+    if (!uid) {
+      const { data: { user: u } } = await supabase.auth.getUser()
+      if (!u) return false
+      uid = u.id
+      userRef.current = u
+    }
 
-    setSavingDraft(true)
     try {
       if (editVideoIdRef.current) {
-        // ── Mise à jour de la vidéo existante (mode édition) ──
-        await supabase.from('videos').update({
-          script:    script,
-          contenu:   script,
-          titre:     projectTitle,
-          avatar_id: selectedAvatar?.avatar_id || null,
-          voice_id:  selectedVoice?.voice_id   || null,
+        // ── Mise à jour d'une vidéo existante ──
+        const { error } = await supabase.from('videos').update({
+          script:    scriptVal,
+          contenu:   scriptVal,
+          titre:     titleVal || 'Brouillon',
+          avatar_id: avatarVal?.avatar_id || null,
+          voice_id:  voiceVal?.voice_id   || null,
           statut:    'script_pret',
         }).eq('id', editVideoIdRef.current)
+        if (error) throw error
       } else {
-        // ── Nouvelle vidéo → créer un draft ──
-        const { data: { user: u } } = await supabase.auth.getUser()
-        if (u) {
-          await supabase.from('videos').insert({
-            user_id:   u.id,
-            script:    script,
-            contenu:   script,
-            titre:     projectTitle || 'Brouillon Piloto Studio',
-            avatar_id: selectedAvatar?.avatar_id || null,
-            voice_id:  selectedVoice?.voice_id   || null,
-            statut:    'script_pret',
-          })
-        }
+        // ── Nouveau draft — upsert basé sur titre+user pour éviter doublons ──
+        const { data: rows, error } = await supabase.from('videos').insert({
+          user_id:   uid,
+          script:    scriptVal,
+          contenu:   scriptVal,
+          titre:     titleVal || 'Brouillon Piloto Studio',
+          avatar_id: avatarVal?.avatar_id || null,
+          voice_id:  voiceVal?.voice_id   || null,
+          statut:    'script_pret',
+        }).select('id').single()
+        if (error) throw error
+        if (rows?.id) editVideoIdRef.current = rows.id
       }
+      lastSavedScript.current = scriptVal
+      return true
     } catch (e) {
-      console.error('Erreur sauvegarde draft:', e)
+      console.error('Erreur save draft:', e)
+      return false
     }
+  }
+
+  // ── Auto-save : 3s après la dernière frappe ───────────────
+  useEffect(() => {
+    if (!script.trim() || hasGeneratedRef.current) return
+    // Si le script n'a pas changé depuis le dernier save → ne rien faire
+    if (script === lastSavedScript.current) return
+    setAutoSaveStatus('saving')
+    clearTimeout(autoSaveTimer.current)
+    autoSaveTimer.current = setTimeout(async () => {
+      const ok = await saveDraftNow(script, projectTitle, selectedAvatar, selectedVoice)
+      setAutoSaveStatus(ok ? 'saved' : 'error')
+      setTimeout(() => setAutoSaveStatus(null), 2500)
+    }, 3000)
+    return () => clearTimeout(autoSaveTimer.current)
+  }, [script, projectTitle, selectedAvatar, selectedVoice])
+
+  // ── Retour : annule le debounce, force save immédiat ─────
+  const handleBack = async () => {
+    if (hasGeneratedRef.current) { router.push('/dashboard'); return }
+    if (!script.trim()) { router.push('/dashboard'); return }
+
+    clearTimeout(autoSaveTimer.current) // flush le debounce en attente
+    setSavingDraft(true)
+    setAutoSaveStatus('saving')
+
+    const ok = await saveDraftNow(script, projectTitle, selectedAvatar, selectedVoice)
+    setAutoSaveStatus(ok ? 'saved' : 'error')
+
+    // Attendre un tick pour laisser React re-render le feedback visuel
+    await new Promise(r => setTimeout(r, 300))
     router.push('/dashboard')
   }
 
@@ -311,6 +355,25 @@ function StudioContent() {
           {isEditMode && (
             <div className="flex items-center gap-1.5 text-[10px] text-[#c0392b] border border-[#c0392b]/30 bg-[#c0392b]/8 px-2 py-1 rounded-lg" style={{ fontFamily: "'DM Mono', monospace" }}>
               {I.edit} Édition
+            </div>
+          )}
+          {/* Indicateur auto-save */}
+          {autoSaveStatus === 'saving' && (
+            <div className="flex items-center gap-1.5 text-[10px] text-[#555]" style={{ fontFamily: "'DM Mono', monospace" }}>
+              <div className="w-2.5 h-2.5 border border-[#333] border-t-[#666] rounded-full animate-spin" />
+              Sauvegarde...
+            </div>
+          )}
+          {autoSaveStatus === 'saved' && (
+            <div className="flex items-center gap-1.5 text-[10px] text-emerald-500/70" style={{ fontFamily: "'DM Mono', monospace" }}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M2 5l2.5 2.5 3.5-4" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round"/></svg>
+              Brouillon sauvegardé
+            </div>
+          )}
+          {autoSaveStatus === 'error' && (
+            <div className="flex items-center gap-1.5 text-[10px] text-red-400/70" style={{ fontFamily: "'DM Mono', monospace" }}>
+              <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><circle cx="5" cy="5" r="4" stroke="currentColor" strokeWidth="1.1"/><path d="M5 3v2.5M5 7v.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+              Erreur sauvegarde
             </div>
           )}
           {editingTitle ? (
