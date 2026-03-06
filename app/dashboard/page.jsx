@@ -241,6 +241,9 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [editDescription, setEditDescription] = useState('')
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [openMenuId, setOpenMenuId] = useState(null)
+  const [renamingVideo, setRenamingVideo] = useState(null)
+  const [renameValue, setRenameValue] = useState('')
   const intervalRef = useRef(null)
 
   const fetchVideos = async () => {
@@ -459,6 +462,40 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           </div>
         )}
 
+        {/* Modal renommer */}
+        {renamingVideo && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="bg-[#0e0e0e] border border-[#222] rounded-2xl p-6 w-full max-w-sm mx-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[18px] text-white">Renommer</h3>
+                <button onClick={() => setRenamingVideo(null)} className="text-[#444] hover:text-white transition">{Icon.close}</button>
+              </div>
+              <input
+                type="text"
+                value={renameValue}
+                onChange={e => setRenameValue(e.target.value)}
+                onKeyDown={async e => {
+                  if (e.key === 'Enter' && renameValue.trim()) {
+                    await supabase.from('videos').update({ titre: renameValue.trim() }).eq('id', renamingVideo.id)
+                    setRenamingVideo(null); fetchVideos()
+                  }
+                }}
+                className={inputCls}
+                placeholder="Nouveau titre..."
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <Btn variant="ghost" onClick={() => setRenamingVideo(null)} className="flex-1 justify-center">Annuler</Btn>
+                <Btn onClick={async () => {
+                  if (!renameValue.trim()) return
+                  await supabase.from('videos').update({ titre: renameValue.trim() }).eq('id', renamingVideo.id)
+                  setRenamingVideo(null); fetchVideos()
+                }} className="flex-1 justify-center">Renommer</Btn>
+              </div>
+            </div>
+          </div>
+        )}
+
         {videos.length === 0 ? (
           <div className="flex flex-col items-center gap-5 py-24 border border-dashed border-[#1a1a1a] rounded-2xl">
             <div className="w-14 h-14 rounded-2xl border border-[#1e1e1e] bg-[#0d0d0d] flex items-center justify-center text-[#2a2a2a]">{Icon.film}</div>
@@ -477,9 +514,12 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
               const isError = v.statut === 'erreur'
               const isDraft = v.statut === 'script_pret'
 
+              const isMenuOpen = openMenuId === v.id
+
               return (
                 <div key={v.id}
-                  className="group relative flex flex-col rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40">
+                  className="group relative flex flex-col rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40"
+                  onClick={() => openMenuId && setOpenMenuId(null)}>
 
                   {/* ── Vignette 16/9 ── */}
                   <div className="relative overflow-hidden" style={{ aspectRatio: '16/9' }}>
@@ -489,7 +529,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       <ThumbnailPlaceholder statut={v.statut} />
                     )}
 
-                    {/* Overlay statut actif — centré sur la vignette */}
+                    {/* Overlay statut actif */}
                     {isActive && (
                       <div className={`absolute inset-0 border flex items-center justify-center ${overlay.bg}`}>
                         <div className="bg-black/60 backdrop-blur-sm rounded-xl px-3.5 py-2 flex items-center gap-2 shadow-lg">
@@ -515,43 +555,102 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Durée pour les vidéos terminées */}
+                    {/* Durée */}
                     {isDone && v.duree && (
                       <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded-md font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
                         {v.duree === 60 ? '1 min' : v.duree === 180 ? '3 min' : '10 min'}
                       </div>
                     )}
 
-                    {/* Hover actions overlay */}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
-                      {v.youtube_video_id && (
-                        <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
-                          className="w-9 h-9 rounded-lg bg-[#c0392b] hover:bg-[#a93226] flex items-center justify-center transition text-white shadow-lg"
-                          title="Voir sur YouTube">
-                          {Icon.external}
-                        </a>
-                      )}
-                      {v.thumbnail_url && (
-                        <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
-                          className="w-9 h-9 rounded-lg bg-emerald-600/90 hover:bg-emerald-600 flex items-center justify-center transition text-white shadow-lg"
-                          title="Télécharger">
-                          {Icon.upload}
-                        </a>
-                      )}
-                      <button onClick={() => ouvrirEdit(v)}
-                        className="w-9 h-9 rounded-lg bg-[#1a1a1a]/90 hover:bg-[#2a2a2a] border border-[#333] flex items-center justify-center transition text-[#aaa] hover:text-white shadow-lg"
+                    {/* Boutons top-right : edit + menu "..." */}
+                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                      <button
+                        onClick={e => { e.stopPropagation(); ouvrirEdit(v) }}
+                        className="w-7 h-7 rounded-lg bg-black/70 backdrop-blur-sm border border-white/10 flex items-center justify-center text-[#ccc] hover:text-white transition"
                         title="Éditer">
-                        <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                          <path d="M9 2L11 4L4.5 10.5L2 11L2.5 8.5L9 2Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round"/>
-                        </svg>
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
                       </button>
-                      <button onClick={() => supprimerVideo(v.id)} disabled={deletingId === v.id}
-                        className="w-9 h-9 rounded-lg bg-[#1a1a1a]/90 hover:bg-red-500/20 border border-[#333] hover:border-red-500/40 flex items-center justify-center transition text-[#555] hover:text-red-400 disabled:opacity-30 shadow-lg"
-                        title="Supprimer">
-                        {deletingId === v.id
-                          ? <div className="w-3 h-3 border border-current border-t-transparent rounded-full animate-spin" />
-                          : Icon.trash}
-                      </button>
+                      <div className="relative">
+                        <button
+                          onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : v.id) }}
+                          className={`w-7 h-7 rounded-lg backdrop-blur-sm border flex items-center justify-center transition ${isMenuOpen ? 'bg-white/15 border-white/20 text-white' : 'bg-black/70 border-white/10 text-[#ccc] hover:text-white'}`}>
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <circle cx="2.5" cy="6.5" r="1" fill="currentColor"/>
+                            <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+                            <circle cx="10.5" cy="6.5" r="1" fill="currentColor"/>
+                          </svg>
+                        </button>
+
+                        {/* Dropdown menu */}
+                        {isMenuOpen && (
+                          <div
+                            className="absolute top-9 right-0 z-50 w-48 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/60 overflow-hidden py-1"
+                            onClick={e => e.stopPropagation()}>
+
+                            {/* Créé par */}
+                            <div className="px-3.5 py-2.5 border-b border-[#1e1e1e]">
+                              <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar Video</p>
+                            </div>
+
+                            {/* Download */}
+                            {v.thumbnail_url ? (
+                              <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
+                                onClick={() => setOpenMenuId(null)}
+                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Télécharger
+                              </a>
+                            ) : (
+                              <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                Télécharger
+                              </div>
+                            )}
+
+                            {/* Publier YouTube */}
+                            {v.youtube_video_id ? (
+                              <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
+                                onClick={() => setOpenMenuId(null)}
+                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
+                                Voir sur YouTube
+                              </a>
+                            ) : (
+                              <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
+                                Publier sur YouTube
+                              </div>
+                            )}
+
+                            {/* Renommer */}
+                            <button
+                              onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
+                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 11h2.5L11 4.5a1.4 1.4 0 00-2-2L2.5 9V11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 2.5l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                              Renommer
+                            </button>
+
+                            {/* Éditer métadonnées */}
+                            <button
+                              onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
+                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                              Modifier
+                            </button>
+
+                            <div className="border-t border-[#1e1e1e] my-1" />
+
+                            {/* Supprimer */}
+                            <button
+                              onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }}
+                              disabled={deletingId === v.id}
+                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
+                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3.5 4l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                              {deletingId === v.id ? 'Suppression...' : 'Supprimer'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     </div>
                   </div>
 
