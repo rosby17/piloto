@@ -199,7 +199,7 @@ export default function Dashboard() {
 
   const nav = [
     { id: 'videos',     label: 'Vidéos',     icon: Icon.grid },
-    { id: 'calendrier', label: 'Calendrier', icon: Icon.calendar },
+    { id: 'voix_off', label: 'Voix off', icon: Icon.mic },
     { id: 'parametres', label: 'Paramètres', icon: Icon.settings },
   ]
 
@@ -275,7 +275,7 @@ export default function Dashboard() {
               onGoToParams={() => { setActiveTab('parametres'); setNouvelleVideo(false) }}
             />
           )}
-          {activeTab === 'calendrier' && <Calendrier user={user} />}
+          {activeTab === 'voix_off' && <VoixOff user={user} />}
           {activeTab === 'parametres' && <Parametres user={user} />}
         </div>
       </div>
