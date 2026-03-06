@@ -258,7 +258,7 @@ export async function POST(request) {
     return Response.json({ success: true, videoId: videoDbId })
 
   } catch (err) {
-    console.error(err)
+    console.error('[generate] uncaught error:', err.message, err.stack)
     return Response.json({ error: err.message }, { status: 500 })
   }
 }
@@ -272,10 +272,14 @@ async function runPipeline({
   chaineData, datePublication,
   scriptDirect, stopAfterVideo,
 }) {
-  const update = (statut, extra = {}) =>
-    supabase.from('videos').update({ statut, ...extra }).eq('id', videoDbId)
+  const update = async (statut, extra = {}) => {
+    const { error } = await supabase.from('videos').update({ statut, ...extra }).eq('id', videoDbId)
+    if (error) console.error(`[pipeline] update error (${statut}):`, JSON.stringify(error))
+  }
 
   let script
+
+  console.log(`[pipeline] start — scriptDirect=${scriptDirect} stopAfterVideo=${stopAfterVideo}`)
 
   if (scriptDirect) {
     script = contenu
@@ -286,6 +290,8 @@ async function runPipeline({
     await update('script_pret', { script })
   }
 
+  console.log(`[pipeline] script ready — ${script.length} chars`)
+
   // Génère titre + description si non fournis
   let titre = titreManuel
   let description = descriptionManuelle
@@ -294,19 +300,45 @@ async function runPipeline({
     titre = titre || meta.titre
     description = description || meta.description
   }
-  await update('meta_pret', { titre, description })
+
+  // Update only fields that exist — titre/description may not be columns
+  try {
+    await update('meta_pret', { titre, description })
+  } catch (e) {
+    console.error('[pipeline] meta_pret update failed (columns may not exist):', e.message)
+    await update('meta_pret')
+  }
+
+  console.log(`[pipeline] meta ready — titre: ${titre}`)
 
   // Envoie à HeyGen
   await update('generation_video')
+  console.log(`[pipeline] calling HeyGen — avatar:${avatarId} voice:${voiceId}`)
   const heygenVideoId = await creerVideoHeygen(script, avatarId, voiceId, heygenKey)
-  await update('video_en_cours', { heygen_video_id: heygenVideoId })
+  console.log(`[pipeline] HeyGen video_id: ${heygenVideoId}`)
+
+  // Try to update with heygen_video_id — column may not exist
+  try {
+    await update('video_en_cours', { heygen_video_id: heygenVideoId })
+  } catch (e) {
+    console.error('[pipeline] heygen_video_id column missing:', e.message)
+    await update('video_en_cours')
+  }
 
   // Attend la fin de génération HeyGen
+  console.log(`[pipeline] waiting for HeyGen...`)
   const videoUrl = await attendreVideoHeygen(heygenVideoId, heygenKey)
+  console.log(`[pipeline] HeyGen done — url: ${videoUrl}`)
 
   // ── Arrêt après HeyGen (publication manuelle) ──────────────
   if (stopAfterVideo) {
-    await update('publiee', { thumbnail_url: videoUrl })
+    try {
+      await update('publiee', { thumbnail_url: videoUrl })
+    } catch (e) {
+      console.error('[pipeline] thumbnail_url column missing:', e.message)
+      await update('publiee')
+    }
+    console.log(`[pipeline] done — stopped after HeyGen`)
     return
   }
 
@@ -317,8 +349,11 @@ async function runPipeline({
   })
 
   const statut = datePublication ? 'programmee' : 'publiee'
-  await update(statut, {
-    youtube_video_id: youtubeVideoId,
-    thumbnail_url: videoUrl,
-  })
+  try {
+    await update(statut, { youtube_video_id: youtubeVideoId, thumbnail_url: videoUrl })
+  } catch (e) {
+    console.error('[pipeline] final update failed:', e.message)
+    await update(statut)
+  }
+  console.log(`[pipeline] done — YouTube id: ${youtubeVideoId}`)
 }
