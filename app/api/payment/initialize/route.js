@@ -27,6 +27,13 @@ export async function POST(req) {
         currency,
         description: `Piloto ${planName} — abonnement mensuel`,
         metadata: { plan },
+        // ── Customer requis par Moneroo ──────────────────────────────────────
+        // TODO: remplace par les vraies infos de l'utilisateur connecté (Supabase session)
+        customer: {
+          email: 'test@piloto.tools-cl.com',
+          first_name: 'Test',
+          last_name: 'User',
+        },
         return_url: `${process.env.NEXT_PUBLIC_APP_URL}/paiement/succes?plan=${plan}`,
         cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/#tarifs`,
       }),
