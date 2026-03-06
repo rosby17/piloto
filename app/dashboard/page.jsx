@@ -233,6 +233,9 @@ export default function Dashboard() {
 }
 
 // ── MES VIDÉOS ─────────────────────────────────────────────
+// Remplace UNIQUEMENT la fonction MesVideos dans ton dashboard
+// Les autres fonctions (NouvelleVideo, Calendrier, Parametres) restent identiques
+
 function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -245,20 +248,77 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [renamingVideo, setRenamingVideo] = useState(null)
   const [renameValue, setRenameValue] = useState('')
   const intervalRef = useRef(null)
+  const pollingRef = useRef({}) // { [videoId]: intervalId }
 
   const fetchVideos = async () => {
     const { data } = await supabase
       .from('videos').select('*')
       .eq('user_id', user.id)
       .order('created_at', { ascending: false })
-    if (data) setVideos(data)
+    if (data) {
+      setVideos(data)
+      // Démarrer le polling pour les vidéos en_cours
+      data.forEach(v => {
+        if (v.statut === 'video_en_cours' && v.heygen_video_id && !pollingRef.current[v.id]) {
+          startPolling(v)
+        }
+        // Arrêter le polling si la vidéo est terminée
+        if (!['video_en_cours', 'generation_video'].includes(v.statut) && pollingRef.current[v.id]) {
+          clearInterval(pollingRef.current[v.id])
+          delete pollingRef.current[v.id]
+        }
+      })
+    }
     setLoading(false)
+  }
+
+  // Polling HeyGen côté frontend — toutes les 15s
+  const startPolling = async (video) => {
+    // Récupérer la clé HeyGen du profil
+    const { data: profile } = await supabase
+      .from('profiles').select('heygen_key').eq('id', user.id).single()
+    const heygenKey = profile?.heygen_key
+    if (!heygenKey) return
+
+    console.log(`🔄 Démarrage polling pour vidéo ${video.id}`)
+
+    const pollId = setInterval(async () => {
+      try {
+        const res = await fetch('/api/heygen/status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            videoId: video.id,
+            heygenVideoId: video.heygen_video_id,
+            heygenKey,
+          }),
+        })
+        const data = await res.json()
+        console.log(`Poll vidéo ${video.id} — statut HeyGen: ${data.status}`)
+
+        if (data.status === 'completed' || data.status === 'failed') {
+          clearInterval(pollingRef.current[video.id])
+          delete pollingRef.current[video.id]
+          fetchVideos() // Rafraîchir la liste
+        }
+      } catch (err) {
+        console.error('Polling error:', err)
+      }
+    }, 15000) // toutes les 15 secondes
+
+    pollingRef.current[video.id] = pollId
   }
 
   useEffect(() => {
     fetchVideos()
+    // Refresh Supabase toutes les 10s (pour les autres statuts)
     intervalRef.current = setInterval(fetchVideos, 10000)
-    return () => clearInterval(intervalRef.current)
+    return () => {
+      clearInterval(intervalRef.current)
+      // Nettoyer tous les pollings actifs
+      Object.values(pollingRef.current).forEach(clearInterval)
+      pollingRef.current = {}
+    }
   }, [])
 
   const ouvrirEdit = (v) => { setEditingVideo(v); setEditTitre(v.titre || ''); setEditDescription(v.description || '') }
@@ -276,7 +336,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     setDeletingId(null); fetchVideos()
   }
 
-  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret'].includes(v.statut))
+  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret', 'upload_youtube'].includes(v.statut))
 
   // ── Config visuelle par statut ──────────────────────────
   const getStatusOverlay = (statut) => {
@@ -302,21 +362,19 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           glowColor: null,
           pulse: false,
         }
-      case 'generation_meta':
-      case 'meta_pret':
+      case 'generation_video':
         return {
-          label: 'Métadonnées IA',
-          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M5 8h6M8 5v6" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-          bg: 'bg-blue-500/20 border-blue-500/30',
-          dot: 'bg-blue-400',
-          badge: 'bg-blue-500/80 text-white',
-          glowColor: '#3b82f6',
+          label: 'Envoi HeyGen...',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M8 5v3l2 2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
+          bg: 'bg-amber-500/20 border-amber-500/30',
+          dot: 'bg-amber-400',
+          badge: 'bg-amber-500/80 text-white',
+          glowColor: '#f59e0b',
           pulse: true,
         }
-      case 'generation_video':
       case 'video_en_cours':
         return {
-          label: 'En file d\'attente',
+          label: 'HeyGen génère...',
           icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="white" strokeWidth="1.3"/><path d="M8 5v3l2 2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
           bg: 'bg-amber-500/20 border-amber-500/30',
           dot: 'bg-amber-400',
@@ -326,13 +384,13 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
         }
       case 'upload_youtube':
         return {
-          label: 'Upload YouTube',
-          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M8 10V3M5 5.5L8 3l3 2.5" stroke="white" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round"/><path d="M2.5 10.5v2a1 1 0 001 1h9a1 1 0 001-1v-2" stroke="white" strokeWidth="1.3" strokeLinecap="round"/></svg>,
-          bg: 'bg-orange-500/20 border-orange-500/30',
-          dot: 'bg-orange-400',
-          badge: 'bg-orange-500/80 text-white',
-          glowColor: '#f97316',
-          pulse: true,
+          label: 'Vidéo prête ✓',
+          icon: <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 8l4 4 8-8" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>,
+          bg: 'bg-emerald-500/20 border-emerald-500/30',
+          dot: 'bg-emerald-400',
+          badge: 'bg-emerald-500/20 text-emerald-400',
+          glowColor: '#10b981',
+          pulse: false,
         }
       case 'publiee':
         return { label: null, badge: 'bg-emerald-500/20 text-emerald-400', dot: 'bg-emerald-400', glowColor: null, pulse: false }
@@ -356,9 +414,8 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const getStatusLabel = (statut) => {
     const map = {
       en_attente: 'En attente', generation_script: 'Script IA', script_pret: 'Draft',
-      generation_meta: 'Métadonnées', meta_pret: 'Prêt', generation_video: 'En file',
-      video_en_cours: 'Heygen', upload_youtube: 'Upload', publiee: 'Publiée',
-      programmee: 'Programmée', erreur: 'Erreur',
+      generation_video: 'Envoi...', video_en_cours: 'HeyGen', upload_youtube: 'Prête ✓',
+      publiee: 'Publiée', programmee: 'Programmée', erreur: 'Erreur',
     }
     return map[statut] || statut
   }
@@ -369,17 +426,14 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     return (
       <div className="w-full h-full relative bg-[#0d0d0d] flex items-center justify-center overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-br from-[#141414] to-[#080808]" />
-        {/* Halo coloré pour les statuts actifs */}
         {overlay.glowColor && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-20 h-20 rounded-full blur-2xl opacity-25"
             style={{ background: overlay.glowColor }} />
         )}
-        {/* Grille subtile */}
         <div className="absolute inset-0 opacity-[0.03]" style={{
           backgroundImage: 'linear-gradient(#fff 1px, transparent 1px), linear-gradient(90deg, #fff 1px, transparent 1px)',
           backgroundSize: '18px 18px'
         }} />
-        {/* Icône centrale */}
         <div className="relative flex flex-col items-center gap-2.5">
           <div className={`w-10 h-10 rounded-xl border flex items-center justify-center ${overlay.bg || 'bg-[#111] border-[#1e1e1e]'}`}>
             {overlay.icon || (
@@ -389,7 +443,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
               </svg>
             )}
           </div>
-          {/* Dots animés pour les statuts en cours */}
           {overlay.pulse && (
             <div className="flex items-center gap-1">
               {[0, 0.15, 0.3].map((delay, i) => (
@@ -510,18 +563,31 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
             {videos.map(v => {
               const overlay = getStatusOverlay(v.statut)
               const isActive = overlay.pulse
-              const isDone = ['publiee', 'programmee'].includes(v.statut)
+              const isDone = ['publiee', 'programmee', 'upload_youtube'].includes(v.statut)
               const isError = v.statut === 'erreur'
               const isDraft = v.statut === 'script_pret'
-
+              const isReady = v.statut === 'upload_youtube'
               const isMenuOpen = openMenuId === v.id
 
               return (
                 <div key={v.id} className="group relative flex flex-col rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40">
 
-                  {/* ── Vignette 16/9 — overflow-hidden isolé ── */}
+                  {/* Vignette 16/9 */}
                   <div className="relative rounded-t-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
-                    {v.thumbnail_url ? (
+                    {/* Si vidéo prête : afficher le lecteur ou lien direct */}
+                    {isReady && v.thumbnail_url ? (
+                      <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer" className="block w-full h-full">
+                        <div className="w-full h-full bg-[#0d0d0d] flex items-center justify-center relative">
+                          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent" />
+                          <div className="relative flex flex-col items-center gap-2">
+                            <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center">
+                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M7 4l10 6-10 6V4Z" fill="#10b981"/></svg>
+                            </div>
+                            <span className="text-[10px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Voir la vidéo</span>
+                          </div>
+                        </div>
+                      </a>
+                    ) : v.thumbnail_url ? (
                       <img src={v.thumbnail_url} alt={v.titre} className="w-full h-full object-cover" />
                     ) : (
                       <ThumbnailPlaceholder statut={v.statut} />
@@ -539,7 +605,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Badge top-left : Draft ou Erreur — sur la vignette seulement */}
                     {isDraft && !isActive && (
                       <div className="absolute top-2 left-2 bg-[#1a1a1a]/90 backdrop-blur-sm border border-[#333] text-[#888] text-[10px] px-2.5 py-1 rounded-lg font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
                         Draft
@@ -551,14 +616,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Durée */}
-                    {isDone && v.duree && (
-                      <div className="absolute bottom-2 right-2 bg-black/80 text-white text-[10px] px-2 py-0.5 rounded-md font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
-                        {v.duree === 60 ? '1 min' : v.duree === 180 ? '3 min' : '10 min'}
-                      </div>
-                    )}
-
-                    {/* Bouton edit top-right (sur vignette) */}
+                    {/* Bouton edit top-right */}
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <button
                         onClick={e => { e.stopPropagation(); ouvrirEdit(v) }}
@@ -569,7 +627,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                     </div>
                   </div>
 
-                  {/* ── Infos bas de card ── */}
+                  {/* Infos bas de card */}
                   <div className="px-3 py-2.5 flex flex-col gap-1.5 flex-1">
                     <p className="text-[12px] font-medium text-white leading-snug line-clamp-2" style={{ minHeight: '34px' }}>
                       {v.titre || <span className="text-[#2a2a2a] italic font-normal">Titre en génération...</span>}
@@ -579,14 +637,13 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                         {new Date(v.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                       </span>
 
-                      {/* Badge statut + bouton "..." dans le bas de card — pas de overflow-hidden ici */}
                       <div className="flex items-center gap-1.5">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${overlay.badge}`} style={{ fontFamily: "'DM Mono', monospace" }}>
                           {overlay.pulse && <span className={`w-1 h-1 rounded-full pulse-dot flex-shrink-0 ${overlay.dot}`} />}
                           {getStatusLabel(v.statut)}
                         </span>
 
-                        {/* Menu "..." — positionné ici pour éviter overflow-hidden */}
+                        {/* Menu "..." */}
                         <div className="relative">
                           <button
                             onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : v.id) }}
@@ -598,7 +655,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                             </svg>
                           </button>
 
-                          {/* Dropdown — s'ouvre vers le haut */}
                           {isMenuOpen && (
                             <div
                               className="absolute bottom-8 right-0 z-50 w-52 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/80 py-1"
@@ -612,14 +668,14 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                               {v.thumbnail_url ? (
                                 <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
                                   onClick={() => setOpenMenuId(null)}
-                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
+                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-emerald-400 hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer font-medium">
                                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Télécharger
+                                  Télécharger la vidéo
                                 </a>
                               ) : (
                                 <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
                                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                  Télécharger
+                                  Télécharger (en cours...)
                                 </div>
                               )}
 
@@ -638,7 +694,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                                 </div>
                               )}
 
-                              {/* Renommer */}
                               <button
                                 onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
                                 className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
@@ -646,7 +701,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                                 Renommer
                               </button>
 
-                              {/* Modifier */}
                               <button
                                 onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
                                 className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
@@ -656,7 +710,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 
                               <div className="border-t border-[#1e1e1e] my-1" />
 
-                              {/* Supprimer */}
                               <button
                                 onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }}
                                 disabled={deletingId === v.id}
