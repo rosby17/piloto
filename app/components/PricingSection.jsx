@@ -1,3 +1,6 @@
+// Remplace la section {/* ── TARIFS ── */} dans app/page.jsx
+// Colle ce composant directement à la place, ou importe-le
+
 'use client'
 
 import { useState } from 'react'
@@ -20,7 +23,7 @@ const PLANS = [
     price: '0',
     priceId: null,
     amount: 0,
-    currency: 'XOF',
+    currency: 'XAF',
     features: ['3 vidéos/mois', '1 chaîne YouTube', 'Script IA basique', 'Miniature auto'],
     cta: 'Commencer',
     highlight: false,
@@ -29,8 +32,8 @@ const PLANS = [
     name: 'Starter',
     price: '9',
     priceId: 'starter_monthly',
-    amount: 90000,
-    currency: 'GNF',
+    amount: 5900,   // ~9€ en XOF
+    currency: 'XAF',
     features: ['15 vidéos/mois', '2 chaînes YouTube', 'Script IA avancé', 'Import PDF/URL', 'Support email'],
     cta: 'Choisir Starter',
     highlight: false,
@@ -39,8 +42,8 @@ const PLANS = [
     name: 'Pro',
     price: '29',
     priceId: 'pro_monthly',
-    amount: 290000,
-    currency: 'GNF',
+    amount: 19000,  // ~29€ en XOF
+    currency: 'XAF',
     features: ['50 vidéos/mois', '5 chaînes YouTube', 'Script IA premium', 'Miniature HD', 'Support prioritaire', 'Analytics'],
     cta: 'Choisir Pro',
     highlight: true,
@@ -50,7 +53,7 @@ const PLANS = [
     price: '99',
     priceId: null,
     amount: 0,
-    currency: 'GNF',
+    currency: 'XAF',
     features: ['Illimité', 'Chaînes illimitées', 'API access', 'White label', 'Account manager'],
     cta: 'Contacter',
     highlight: false,
@@ -90,7 +93,7 @@ export default function PricingSection() {
       const data = await res.json()
 
       if (!res.ok || !data.checkout_url) {
-        throw new Error(data.error || "Erreur lors de l'initialisation du paiement")
+        throw new Error(data.error || 'Erreur lors de l\'initialisation du paiement')
       }
 
       window.location.href = data.checkout_url
