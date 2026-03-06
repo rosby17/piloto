@@ -37,7 +37,6 @@ const STATUTS = {
   generation_video:  { label: 'Envoi Heygen',       color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
   video_en_cours:    { label: 'Heygen en cours',    color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
   upload_youtube:    { label: 'Upload YouTube',     color: 'text-orange-400',  bg: 'bg-orange-400/8 border-orange-400/15', pulse: true  },
-  video_prete:       { label: 'Vidéo prête',        color: 'text-green-400',   bg: 'bg-green-400/8 border-green-400/15',   pulse: false },
   publiee:           { label: 'Publiée',            color: 'text-emerald-400', bg: 'bg-emerald-400/8 border-emerald-400/15', pulse: false },
   programmee:        { label: 'Programmée',         color: 'text-sky-400',     bg: 'bg-sky-400/8 border-sky-400/15',       pulse: false },
   erreur:            { label: 'Erreur',             color: 'text-red-400',     bg: 'bg-red-400/8 border-red-400/15',       pulse: false },
@@ -277,18 +276,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     setDeletingId(null); fetchVideos()
   }
 
-  const publierVideo = async (video) => {
-    if (!confirm('Publier cette vidéo sur YouTube maintenant ?')) return
-    await supabase.from('videos').update({ statut: 'upload_youtube' }).eq('id', video.id)
-    fetchVideos()
-    fetch('/api/publish', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ videoId: video.id, userId: user.id }),
-    }).then(() => fetchVideos())
-  }
-
-  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret', 'video_prete'].includes(v.statut))
+  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret'].includes(v.statut))
 
   // ── Config visuelle par statut ──────────────────────────
   const getStatusOverlay = (statut) => {
@@ -346,8 +334,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           glowColor: '#f97316',
           pulse: true,
         }
-      case 'video_prete':
-        return { label: null, badge: 'bg-green-500/20 text-green-400', dot: 'bg-green-400', glowColor: null, pulse: false }
       case 'publiee':
         return { label: null, badge: 'bg-emerald-500/20 text-emerald-400', dot: 'bg-emerald-400', glowColor: null, pulse: false }
       case 'programmee':
@@ -371,7 +357,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     const map = {
       en_attente: 'En attente', generation_script: 'Script IA', script_pret: 'Draft',
       generation_meta: 'Métadonnées', meta_pret: 'Prêt', generation_video: 'En file',
-      video_en_cours: 'Heygen', upload_youtube: 'Upload', video_prete: 'Vidéo prête', publiee: 'Publiée',
+      video_en_cours: 'Heygen', upload_youtube: 'Upload', publiee: 'Publiée',
       programmee: 'Programmée', erreur: 'Erreur',
     }
     return map[statut] || statut
@@ -524,8 +510,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
             {videos.map(v => {
               const overlay = getStatusOverlay(v.statut)
               const isActive = overlay.pulse
-              const isDone = ['publiee', 'programmee', 'video_prete'].includes(v.statut)
-              const isReadyToPublish = v.statut === 'video_prete'
+              const isDone = ['publiee', 'programmee'].includes(v.statut)
               const isError = v.statut === 'erreur'
               const isDraft = v.statut === 'script_pret'
 
@@ -581,94 +566,6 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                         title="Modifier">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
                       </button>
-                      <div className="relative">
-                        <button
-                          onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : v.id) }}
-                          className={`w-7 h-7 rounded-lg backdrop-blur-sm border flex items-center justify-center transition ${isMenuOpen ? 'bg-white/15 border-white/20 text-white' : 'bg-black/70 border-white/10 text-[#ccc] hover:text-white'}`}>
-                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                            <circle cx="2.5" cy="6.5" r="1" fill="currentColor"/>
-                            <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
-                            <circle cx="10.5" cy="6.5" r="1" fill="currentColor"/>
-                          </svg>
-                        </button>
-
-                        {/* Dropdown menu */}
-                        {isMenuOpen && (
-                          <div
-                            className="absolute top-9 right-0 z-50 w-48 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/60 overflow-hidden py-1"
-                            onClick={e => e.stopPropagation()}>
-
-                            {/* Créé par */}
-                            <div className="px-3.5 py-2.5 border-b border-[#1e1e1e]">
-                              <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar Video</p>
-                            </div>
-
-                            {/* Download */}
-                            {v.thumbnail_url ? (
-                              <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
-                                onClick={() => setOpenMenuId(null)}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Télécharger
-                              </a>
-                            ) : (
-                              <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Télécharger
-                              </div>
-                            )}
-
-                            {/* Publier YouTube */}
-                            {v.youtube_video_id ? (
-                              <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
-                                onClick={() => setOpenMenuId(null)}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
-                                Voir sur YouTube
-                              </a>
-                            ) : isReadyToPublish ? (
-                              <button
-                                onClick={() => { publierVideo(v); setOpenMenuId(null) }}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-green-400 hover:text-white hover:bg-green-500/10 transition w-full text-left">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
-                                Publier sur YouTube
-                              </button>
-                            ) : (
-                              <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
-                                Publier sur YouTube
-                              </div>
-                            )}
-
-                            {/* Renommer */}
-                            <button
-                              onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
-                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 11h2.5L11 4.5a1.4 1.4 0 00-2-2L2.5 9V11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 2.5l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                              Renommer
-                            </button>
-
-                            {/* Éditer métadonnées */}
-                            <button
-                              onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
-                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                              Modifier
-                            </button>
-
-                            <div className="border-t border-[#1e1e1e] my-1" />
-
-                            {/* Supprimer */}
-                            <button
-                              onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }}
-                              disabled={deletingId === v.id}
-                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3.5 4l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              {deletingId === v.id ? 'Suppression...' : 'Supprimer'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </div>
 
@@ -1430,7 +1327,7 @@ ${scriptBrut}`
                   { label: 'Avatar', value: selectedAvatarObj?.avatar_name || avatarId || '—' },
                   { label: 'Voix',   value: selectedVoiceObj?.name || voiceId || '—' },
                   { label: 'Script', value: contenu ? `${contenu.split(' ').length} mots` : '—' },
-                  { label: 'Titre',  value: titre || 'Généré par l'IA' },
+                  { label: 'Titre',  value: titre || "Généré par l'IA" },
                 ].map(({ label, value }) => (
                   <div key={label} className="flex items-center justify-between px-4 py-3">
                     <span className="text-[11px] text-[#555]" style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
