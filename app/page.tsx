@@ -1,4 +1,6 @@
 'use client'
+import PricingSection from './components/PricingSection'
+
 
 const Icon = {
   plane: (
@@ -278,75 +280,10 @@ export default function Home() {
       </section>
 
       {/* ── TARIFS ──────────────────────────────────────── */}
-      <section id="tarifs" className="py-28 px-8">
-        <div className="max-w-4xl mx-auto">
-          <div className="mb-16">
-            <p className="text-[11px] text-[#333] tracking-[.2em] uppercase mb-3" style={{ fontFamily: "'DM Mono', monospace" }}>
-              Tarifs
-            </p>
-            <h2 style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[40px] leading-tight text-white">
-              Simple et transparent.
-            </h2>
-          </div>
 
-          <div className="grid md:grid-cols-4 gap-3 items-start">
-            {[
-              {
-                name: 'Gratuit', price: '0', features: ['3 vidéos/mois', '1 chaîne YouTube', 'Script IA basique', 'Miniature auto'],
-                cta: 'Commencer', highlight: false,
-              },
-              {
-                name: 'Starter', price: '9', features: ['15 vidéos/mois', '2 chaînes YouTube', 'Script IA avancé', 'Import PDF/URL', 'Support email'],
-                cta: 'Choisir', highlight: false,
-              },
-              {
-                name: 'Pro', price: '29', features: ['50 vidéos/mois', '5 chaînes YouTube', 'Script IA premium', 'Miniature HD', 'Support prioritaire', 'Analytics'],
-                cta: 'Choisir Pro', highlight: true,
-              },
-              {
-                name: 'Agency', price: '99', features: ['Illimité', 'Chaînes illimitées', 'API access', 'White label', 'Account manager'],
-                cta: 'Contacter', highlight: false,
-              },
-            ].map((plan, i) => (
-              <div key={i} className={`rounded-xl border flex flex-col p-5 ${
-                plan.highlight
-                  ? 'border-[#c0392b] bg-[#c0392b]/5'
-                  : 'border-[#131313] bg-[#080808]'
-              }`}>
-                {plan.highlight && (
-                  <div className="flex items-center gap-1.5 mb-4">
-                    <div className="w-1.5 h-1.5 rounded-full bg-[#c0392b]" />
-                    <span className="text-[11px] text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>Populaire</span>
-                  </div>
-                )}
-                <div className="mb-1">
-                  <span className="text-[12px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>{plan.name}</span>
-                </div>
-                <div className="mb-5 flex items-baseline gap-1">
-                  <span style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[38px] text-white leading-none">{plan.price}€</span>
-                  <span className="text-[12px] text-[#333]">/mois</span>
-                </div>
-                <ul className="space-y-2 mb-6 flex-1">
-                  {plan.features.map((f, j) => (
-                    <li key={j} className="flex items-center gap-2 text-[12px] text-[#444]">
-                      <span className={plan.highlight ? 'text-[#c0392b]' : 'text-[#2a2a2a]'}>{Icon.check}</span>
-                      {f}
-                    </li>
-                  ))}
-                </ul>
-                <a href="/register"
-                  className={`text-center text-[12px] font-medium py-2.5 rounded-lg transition ${
-                    plan.highlight
-                      ? 'bg-[#c0392b] hover:bg-[#a93226] text-white'
-                      : 'border border-[#1e1e1e] hover:border-[#2a2a2a] text-[#555] hover:text-white'
-                  }`}>
-                  {plan.cta}
-                </a>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
+      <PricingSection />
+
+
 
       {/* ── CTA FINAL ───────────────────────────────────── */}
       <section className="py-28 px-8 border-t border-[#131313] relative overflow-hidden">
