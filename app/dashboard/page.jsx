@@ -757,11 +757,14 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
     setAnalysing(true)
     setEtape('analyse')
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`,
+        },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'llama-3.3-70b-versatile',
           max_tokens: 1000,
           messages: [{
             role: 'user',
@@ -781,7 +784,7 @@ ${scriptBrut.substring(0, 3000)}`
         })
       })
       const data = await response.json()
-      const text = data.content?.[0]?.text || '{}'
+      const text = data.choices?.[0]?.message?.content || '{}'
       const clean = text.replace(/```json|```/g, '').trim()
       const parsed = JSON.parse(clean)
       setSuggestions(parsed)
@@ -808,11 +811,14 @@ ${scriptBrut.substring(0, 3000)}`
       long: '15000-30000 caractères (15-20 min)',
     }
     try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
+      const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${process.env.NEXT_PUBLIC_GROQ_API_KEY}`,
+        },
         body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
+          model: 'llama-3.3-70b-versatile',
           max_tokens: 4000,
           messages: [{
             role: 'user',
@@ -838,7 +844,7 @@ ${scriptBrut}`
         })
       })
       const data = await response.json()
-      const script = data.content?.[0]?.text || scriptBrut
+      const script = data.choices?.[0]?.message?.content || scriptBrut
       setScriptGenere(script)
       setContenu(script)
     } catch (err) {

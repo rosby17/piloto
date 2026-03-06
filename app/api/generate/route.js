@@ -10,11 +10,14 @@ const supabase = createClient(
 
 async function genererScriptIA(contenu, duree) {
   const mots = duree === '60' ? 120 : duree === '180' ? 360 : 1200
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+    },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'llama-3.3-70b-versatile',
       max_tokens: 2000,
       messages: [{
         role: 'user',
@@ -23,15 +26,19 @@ async function genererScriptIA(contenu, duree) {
     })
   })
   const data = await res.json()
-  return data.content?.[0]?.text || contenu
+  if (!res.ok) console.error('Anthropic genScript error:', JSON.stringify(data))
+  return data.choices?.[0]?.message?.content || contenu
 }
 
 async function genererMetadonnees(script) {
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.GROQ_API_KEY}`,
+    },
     body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
+      model: 'llama-3.3-70b-versatile',
       max_tokens: 500,
       messages: [{
         role: 'user',
@@ -40,7 +47,8 @@ async function genererMetadonnees(script) {
     })
   })
   const data = await res.json()
-  const text = data.content?.[0]?.text || '{}'
+  if (!res.ok) console.error('Anthropic genMeta error:', JSON.stringify(data))
+  const text = data.choices?.[0]?.message?.content || '{}'
   try {
     return JSON.parse(text.replace(/```json|```/g, '').trim())
   } catch {
@@ -211,22 +219,25 @@ export async function POST(request) {
     }
 
     // Crée l'entrée vidéo en base
+    const insertPayload = {
+      user_id: userId,
+      channel_id: chaineData?.channel_id || null,
+      script: contenu,
+      duree: parseInt(duree) || 60,
+      statut: scriptDirect ? 'generation_video' : 'generation_script',
+    }
+    // Ajoute date_publication seulement si fournie (évite erreur colonne nullable)
+    if (datePublication) insertPayload.date_publication = datePublication
+
     const { data: video, error: videoError } = await supabase
       .from('videos')
-      .insert({
-        user_id: userId,
-        channel_id: chaineData?.channel_id || null,
-        script: contenu,
-        duree: parseInt(duree) || 60,
-        statut: scriptDirect ? 'generation_video' : 'generation_script',
-        date_publication: datePublication || null,
-      })
+      .insert(insertPayload)
       .select()
       .single()
 
     if (videoError) {
-      console.error('Supabase insert error:', videoError)
-      return Response.json({ error: 'Erreur création vidéo' }, { status: 500 })
+      console.error('Supabase insert error:', JSON.stringify(videoError))
+      return Response.json({ error: `Erreur création vidéo: ${videoError.message}` }, { status: 500 })
     }
 
     const videoDbId = video.id
