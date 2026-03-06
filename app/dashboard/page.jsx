@@ -230,6 +230,7 @@ export default function Dashboard() {
 
 // ── MES VIDÉOS ─────────────────────────────────────────────
 function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
+  const router = useRouter()
   const [videos, setVideos] = useState([])
   const [loading, setLoading] = useState(true)
   const [editingVideo, setEditingVideo] = useState(null)
@@ -663,12 +664,18 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Bouton edit top-right */}
+                    {/* Bouton crayon → Piloto Studio */}
                     <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <button
-                        onClick={e => { e.stopPropagation(); ouvrirEdit(v) }}
+                        onClick={e => {
+                          e.stopPropagation()
+                          sessionStorage.setItem('piloto_studio_video_id', v.id)
+                          sessionStorage.setItem('piloto_studio_script', v.script || '')
+                          sessionStorage.setItem('piloto_studio_title', v.titre || '')
+                          router.push('/dashboard/studio')
+                        }}
                         className="w-7 h-7 rounded-lg bg-black/70 backdrop-blur-sm border border-white/10 flex items-center justify-center text-[#ccc] hover:text-white transition"
-                        title="Modifier">
+                        title="Éditer dans Piloto Studio">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
                       </button>
                     </div>
@@ -704,12 +711,29 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
 
                           {isMenuOpen && (
                             <div
-                              className="absolute bottom-8 right-0 z-50 w-52 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/80 py-1"
+                              className="absolute z-[999] w-56 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/80 py-1"
+                              style={{ bottom: '100%', right: 0, marginBottom: '6px' }}
                               onClick={e => e.stopPropagation()}>
 
                               <div className="px-3.5 py-2 border-b border-[#1e1e1e] mb-1">
-                                <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar Video</p>
+                                <p className="text-[10px] text-[#444] truncate" style={{ fontFamily: "'DM Mono', monospace" }}>{v.titre || 'Vidéo'}</p>
                               </div>
+
+                              {/* Éditer dans Studio */}
+                              <button
+                                onClick={() => {
+                                  setOpenMenuId(null)
+                                  sessionStorage.setItem('piloto_studio_video_id', v.id)
+                                  sessionStorage.setItem('piloto_studio_script', v.script || '')
+                                  sessionStorage.setItem('piloto_studio_title', v.titre || '')
+                                  router.push('/dashboard/studio')
+                                }}
+                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#c0392b] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left font-medium">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 5.5l3.5 2L5 9V5.5Z" fill="currentColor"/></svg>
+                                Éditer dans Studio
+                              </button>
+
+                              <div className="border-t border-[#1e1e1e] my-1" />
 
                               {/* Lire la vidéo */}
                               {v.thumbnail_url ? (
@@ -731,7 +755,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                                 <a href={v.thumbnail_url} download
                                   onClick={() => setOpenMenuId(null)}
                                   className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
-                                  {Icon.download} Télécharger la vidéo
+                                  {Icon.download} Télécharger
                                 </a>
                               ) : (
                                 <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
@@ -754,6 +778,8 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                                 </div>
                               )}
 
+                              <div className="border-t border-[#1e1e1e] my-1" />
+
                               <button
                                 onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
                                 className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
@@ -765,7 +791,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                                 onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
                                 className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                                Modifier
+                                Modifier titre/desc
                               </button>
 
                               <div className="border-t border-[#1e1e1e] my-1" />
