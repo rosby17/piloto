@@ -6,18 +6,15 @@ export async function POST(request) {
   if (!voiceId)   return Response.json({ error: 'voiceId manquant' },      { status: 400 })
   if (!script)    return Response.json({ error: 'Script manquant' },       { status: 400 })
 
-  // Endpoints à essayer dans l'ordre
   const attempts = [
+    // Endpoint officiel Starfish (plans API)
     {
-      url: 'https://api.heygen.com/v1/text_to_speech',
+      url: 'https://api.heygen.com/v1/audio/text_to_speech',
       body: { voice_id: voiceId, text: script, speed, pitch },
     },
+    // Ancien endpoint legacy
     {
-      url: 'https://api.heygen.com/v1/text_to_speech',
-      body: { voice_id: voiceId, input: script, speed, pitch },
-    },
-    {
-      url: 'https://api.heygen.com/v1/tts',
+      url: 'https://api2.heygen.com/v1/online/text_to_speech.generate',
       body: { voice_id: voiceId, text: script, speed, pitch },
     },
   ]
@@ -26,7 +23,7 @@ export async function POST(request) {
 
   for (const attempt of attempts) {
     try {
-      console.log('[TTS] Essai:', attempt.url, JSON.stringify(attempt.body).slice(0, 100))
+      console.log('[TTS] Essai:', attempt.url)
 
       const res = await fetch(attempt.url, {
         method: 'POST',
@@ -38,9 +35,8 @@ export async function POST(request) {
       })
 
       const raw = await res.text()
-      console.log('[TTS] Status:', res.status, '| Réponse:', raw.slice(0, 300))
+      console.log('[TTS] Status:', res.status, '| Réponse:', raw.slice(0, 400))
 
-      // Skip les 404
       if (res.status === 404) { lastError = `404 sur ${attempt.url}`; continue }
 
       let data
@@ -51,11 +47,18 @@ export async function POST(request) {
         continue
       }
 
-      const audioUrl    = data.data?.audio_url    || data.audio_url    || null
-      const audioBase64 = data.data?.audio_base64 || data.audio_base64 || null
+      const audioUrl = data.data?.audio_url
+                    || data.audio_url
+                    || data.data?.url
+                    || data.url
+                    || null
+
+      const audioBase64 = data.data?.audio_base64
+                       || data.audio_base64
+                       || null
 
       if (!audioUrl && !audioBase64) {
-        lastError = 'Aucun audio dans la réponse: ' + raw.slice(0, 200)
+        lastError = 'Aucun audio dans la réponse: ' + raw.slice(0, 300)
         continue
       }
 
