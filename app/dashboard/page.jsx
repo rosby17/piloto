@@ -67,6 +67,39 @@ function timeAgo(dateStr) {
 // ── Statuts considérés "en cours de génération" ────────────
 const STATUTS_EN_COURS = ['generation_script', 'generation_meta', 'generation_video', 'video_en_cours', 'en_attente']
 
+// ── Formate les secondes en "Xmin Xs" style YouTube ────────
+function formatDuration(secs) {
+  if (!secs || isNaN(secs)) return null
+  const h = Math.floor(secs / 3600)
+  const m = Math.floor((secs % 3600) / 60)
+  const s = Math.floor(secs % 60)
+  if (h > 0) return `${h}h ${m}min`
+  if (m > 0) return `${m}min${s > 0 ? ' ' + s + 's' : ''}`
+  return `${s}s`
+}
+
+// ── Badge durée vidéo — lit les métadonnées au chargement ──
+function VideoDurationBadge({ src }) {
+  const [duration, setDuration] = useState(null)
+  useEffect(() => {
+    if (!src) return
+    const video = document.createElement('video')
+    video.preload = 'metadata'
+    video.src = src
+    video.onloadedmetadata = () => setDuration(video.duration)
+  }, [src])
+  const label = formatDuration(duration)
+  return (
+    <div className="absolute bottom-2 right-2 flex items-center gap-1 bg-black/75 backdrop-blur-sm px-1.5 py-0.5 rounded" style={{ fontFamily: "'DM Mono', monospace" }}>
+      <svg width="9" height="9" viewBox="0 0 10 10" fill="none" className="text-white/70 flex-shrink-0">
+        <rect x="1" y="2" width="8" height="6" rx="1" stroke="currentColor" strokeWidth="1.1"/>
+        <path d="M4 4l3 1.5L4 7V4Z" fill="currentColor"/>
+      </svg>
+      <span className="text-[10px] text-white font-medium leading-none">{label ?? '···'}</span>
+    </div>
+  )
+}
+
 // ── Composants réutilisables ───────────────────────────────
 function PageHeader({ title, sub, action }) {
   return (
@@ -752,10 +785,8 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                             </svg>
                           </div>
                         </div>
-                        <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm border border-emerald-500/30 px-2 py-1 rounded-lg">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
-                          <span className="text-[10px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Prête</span>
-                        </div>
+                        {/* Badge durée style YouTube */}
+                        <VideoDurationBadge src={v.thumbnail_url} />
                       </button>
                     ) : v.thumbnail_url ? (
                       <img src={v.thumbnail_url} alt={v.titre} className="w-full h-full object-cover" />
