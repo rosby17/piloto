@@ -88,6 +88,12 @@ function StudioContent() {
   const [generated, setGenerated] = useState(false)
   const [error, setError] = useState('')
 
+  // Defaults
+  const [defaultAvatarId, setDefaultAvatarId] = useState(null)
+  const [defaultVoiceId, setDefaultVoiceId]   = useState(null)
+  const [savingDefault, setSavingDefault]      = useState(false)
+  const [defaultSaved, setDefaultSaved]        = useState(false)
+
   // User
   const [user, setUser] = useState(null)
 
@@ -116,6 +122,10 @@ function StudioContent() {
           const data = await res.json()
           if (data.avatars) setAvatars(data.avatars)
           if (data.voices)  setVoices(data.voices)
+
+          // Store defaults
+          if (profile.default_avatar_id) setDefaultAvatarId(profile.default_avatar_id)
+          if (profile.default_voice_id)  setDefaultVoiceId(profile.default_voice_id)
 
           // Pre-select defaults
           if (profile.default_avatar_id) {
@@ -166,6 +176,26 @@ function StudioContent() {
       setError(e.message)
     }
     setGenerating(false)
+  }
+
+  const saveAsDefault = async () => {
+    if (!user || (!selectedAvatar && !selectedVoice)) return
+    setSavingDefault(true)
+    const updates = {}
+    if (selectedAvatar) {
+      updates.default_avatar_id   = selectedAvatar.avatar_id
+      updates.default_avatar_name = selectedAvatar.avatar_name
+      setDefaultAvatarId(selectedAvatar.avatar_id)
+    }
+    if (selectedVoice) {
+      updates.default_voice_id   = selectedVoice.voice_id
+      updates.default_voice_name = selectedVoice.name
+      setDefaultVoiceId(selectedVoice.voice_id)
+    }
+    await supabase.from('profiles').update(updates).eq('id', user.id)
+    setSavingDefault(false)
+    setDefaultSaved(true)
+    setTimeout(() => setDefaultSaved(false), 2500)
   }
 
   const filteredAvatars = avatars.filter(a =>
@@ -231,9 +261,20 @@ function StudioContent() {
         {/* Right — Generate */}
         <div className="flex items-center gap-2">
           {error && <span className="text-[11px] text-red-400 max-w-[200px] truncate">{error}</span>}
+          {defaultSaved && (
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg">
+              {I.check} Défauts sauvegardés
+            </div>
+          )}
           {generated && (
-            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400">
+            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-1.5 rounded-lg">
               {I.check} Envoyé à Heygen
+            </div>
+          )}
+          {/* What's missing indicator */}
+          {!generated && (!selectedAvatar || !selectedVoice || !script.trim()) && (
+            <div className="flex items-center gap-1.5 text-[11px] text-[#555] border border-[#1e1e1e] px-2.5 py-1.5 rounded-lg" style={{ fontFamily: "'DM Mono', monospace" }}>
+              {!script.trim() ? '⚠ Script vide' : !selectedAvatar ? '⚠ Avatar manquant' : '⚠ Voix manquante'}
             </div>
           )}
           <button
@@ -402,19 +443,36 @@ function StudioContent() {
               <div className="p-3 space-y-3 fade-in">
                 {/* Selected avatar preview */}
                 {selectedAvatar && (
-                  <div className="flex items-center gap-3 px-3 py-2.5 bg-[#111] border border-[#c0392b]/20 rounded-xl">
-                    <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">
-                      {selectedAvatar.preview_image_url
-                        ? <img src={selectedAvatar.preview_image_url} alt="" className="w-full h-full object-cover object-top" />
-                        : <div className="w-full h-full flex items-center justify-center text-[#333]">{I.user}</div>}
+                  <div className="bg-[#111] border border-[#c0392b]/20 rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-3 px-3 py-2.5">
+                      <div className="w-10 h-10 rounded-lg overflow-hidden bg-[#1a1a1a] flex-shrink-0">
+                        {selectedAvatar.preview_image_url
+                          ? <img src={selectedAvatar.preview_image_url} alt="" className="w-full h-full object-cover object-top" />
+                          : <div className="w-full h-full flex items-center justify-center text-[#333]">{I.user}</div>}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[12px] font-medium text-white truncate">{selectedAvatar.avatar_name}</p>
+                          {defaultAvatarId === selectedAvatar.avatar_id && (
+                            <span className="text-[9px] text-[#c0392b] border border-[#c0392b]/30 px-1.5 py-0.5 rounded font-medium flex-shrink-0" style={{ fontFamily: "'DM Mono', monospace" }}>DÉFAUT</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                          {selectedAvatar.type === 'personal' ? 'Mon avatar' : 'Bibliothèque'}
+                        </p>
+                      </div>
+                      <button onClick={() => setSelectedAvatar(null)} className="text-[#333] hover:text-[#666] transition flex-shrink-0">{I.close}</button>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-medium text-white truncate">{selectedAvatar.avatar_name}</p>
-                      <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>
-                        {selectedAvatar.type === 'personal' ? 'Mon avatar' : 'Bibliothèque'}
-                      </p>
-                    </div>
-                    <button onClick={() => setSelectedAvatar(null)} className="text-[#333] hover:text-[#666] transition flex-shrink-0">{I.close}</button>
+                    {defaultAvatarId !== selectedAvatar.avatar_id && (
+                      <button
+                        onClick={saveAsDefault}
+                        disabled={savingDefault}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 border-t border-[#1a1a1a] text-[10px] text-[#555] hover:text-[#c0392b] hover:bg-[#c0392b]/5 transition disabled:opacity-40"
+                        style={{ fontFamily: "'DM Mono', monospace" }}>
+                        {savingDefault ? <div className="w-2.5 h-2.5 border border-[#c0392b]/30 border-t-[#c0392b] rounded-full animate-spin" /> : <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                        Définir comme avatar par défaut
+                      </button>
+                    )}
                   </div>
                 )}
 
@@ -454,9 +512,16 @@ function StudioContent() {
                       <p className="text-[9px] text-[#333] tracking-widest uppercase mb-2 px-1" style={{ fontFamily: "'DM Mono', monospace" }}>Bibliothèque</p>
                       <div className="grid grid-cols-3 gap-1.5">
                         {filteredAvatars.filter(a => a.type !== 'personal').map(avatar => (
-                          <AvatarCardMini key={avatar.avatar_id} avatar={avatar}
+                          <div key={avatar.avatar_id} className="relative">
+                          <AvatarCardMini avatar={avatar}
                             selected={selectedAvatar?.avatar_id === avatar.avatar_id}
                             onSelect={() => setSelectedAvatar(avatar)} />
+                          {defaultAvatarId === avatar.avatar_id && (
+                            <div className="absolute bottom-5 left-0 right-0 flex justify-center pointer-events-none">
+                              <span className="text-[7px] text-[#c0392b] bg-black/80 px-1 py-0.5 rounded" style={{ fontFamily: "'DM Mono', monospace" }}>défaut</span>
+                            </div>
+                          )}
+                          </div>
                         ))}
                       </div>
                       {filteredAvatars.filter(a => a.type !== 'personal').length === 0 && !loadingAssets && (
@@ -473,15 +538,32 @@ function StudioContent() {
               <div className="p-3 space-y-3 fade-in">
                 {/* Selected voice */}
                 {selectedVoice && (
-                  <div className="flex items-center gap-3 px-3 py-2.5 bg-[#111] border border-[#c0392b]/20 rounded-xl">
-                    <div className="w-8 h-8 rounded-lg bg-[#c0392b]/15 flex items-center justify-center text-[#c0392b] flex-shrink-0">
-                      {I.mic}
+                  <div className="bg-[#111] border border-[#c0392b]/20 rounded-xl overflow-hidden">
+                    <div className="flex items-center gap-3 px-3 py-2.5">
+                      <div className="w-8 h-8 rounded-lg bg-[#c0392b]/15 flex items-center justify-center text-[#c0392b] flex-shrink-0">
+                        {I.mic}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <p className="text-[12px] font-medium text-white truncate">{selectedVoice.name}</p>
+                          {defaultVoiceId === selectedVoice.voice_id && (
+                            <span className="text-[9px] text-[#c0392b] border border-[#c0392b]/30 px-1.5 py-0.5 rounded font-medium flex-shrink-0" style={{ fontFamily: "'DM Mono', monospace" }}>DÉFAUT</span>
+                          )}
+                        </div>
+                        <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>{selectedVoice.language || selectedVoice.locale}</p>
+                      </div>
+                      <div className="w-5 h-5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0">{I.check}</div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-[12px] font-medium text-white truncate">{selectedVoice.name}</p>
-                      <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>{selectedVoice.language || selectedVoice.locale}</p>
-                    </div>
-                    <div className="w-5 h-5 rounded-full bg-[#c0392b] flex items-center justify-center flex-shrink-0">{I.check}</div>
+                    {defaultVoiceId !== selectedVoice.voice_id && (
+                      <button
+                        onClick={saveAsDefault}
+                        disabled={savingDefault}
+                        className="w-full flex items-center justify-center gap-1.5 py-2 border-t border-[#1a1a1a] text-[10px] text-[#555] hover:text-[#c0392b] hover:bg-[#c0392b]/5 transition disabled:opacity-40"
+                        style={{ fontFamily: "'DM Mono', monospace" }}>
+                        {savingDefault ? <div className="w-2.5 h-2.5 border border-[#c0392b]/30 border-t-[#c0392b] rounded-full animate-spin" /> : <svg width="10" height="10" viewBox="0 0 10 10" fill="none"><path d="M5 1v8M1 5h8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>}
+                        Définir comme voix par défaut
+                      </button>
+                    )}
                   </div>
                 )}
 
