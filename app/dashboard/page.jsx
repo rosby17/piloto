@@ -748,9 +748,9 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           userId: u.id, contenu, duree, avatarId, voiceId, heygenKey,
-          titre, description, chaineId: chaineSelectionnee?.id,
-          datePublication: datePublication || null,
+          titre, description,
           scriptDirect: true,
+          stopAfterVideo: true, // ← ne pas uploader sur YouTube automatiquement
         })
       })
       const data = await res.json()
@@ -946,76 +946,81 @@ function NouvelleVideo({ user, onBack, onGoToParams }) {
           </div>
         )}
 
-        {/* ── ÉTAPE PUBLICATION ── */}
+        {/* ── ÉTAPE CONFIRMATION ── */}
         {etape === 'publication' && (
-          <div className="space-y-6">
-            <Field label="Titre YouTube" optional>
-              <input type="text" value={titre} onChange={e => setTitre(e.target.value)} className={inputCls} placeholder="Laisse vide → généré par l'IA" />
-            </Field>
-            <Field label="Description" optional>
-              <textarea value={description} onChange={e => setDescription(e.target.value)} className={`${inputCls} resize-none`} rows={3} placeholder="Laisse vide → générée par l'IA" />
-            </Field>
-            <Field label="Chaîne YouTube">
-              {chaines.length === 0 ? (
-                <div className="flex flex-col items-center gap-3 py-10 border border-dashed border-[#1e1e1e] rounded-lg">
-                  <span className="text-[#333]">{Icon.youtube}</span>
-                  <p className="text-[12px] text-[#444]">Aucune chaîne connectée</p>
-                  <Btn variant="subtle" onClick={onGoToParams}>Paramètres {Icon.arrow}</Btn>
-                </div>
-              ) : (
-                <div className="space-y-2">
-                  {chaines.map(ch => (
-                    <button key={ch.id} onClick={() => setChaineSelectionnee(ch)}
-                      className={`w-full flex items-center gap-3.5 px-4 py-3 rounded-lg border transition-all text-left ${chaineSelectionnee?.id === ch.id ? 'border-[#c0392b] bg-[#c0392b]/5' : 'border-[#1e1e1e] bg-[#111] hover:border-[#2a2a2a]'}`}>
-                      <div className="w-8 h-8 rounded-md bg-[#c0392b] flex items-center justify-center text-[12px] font-semibold text-white flex-shrink-0">
-                        {ch.channel_name[0].toUpperCase()}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-[13px] font-medium text-white">{ch.channel_name}</p>
-                        <p className="text-[11px] text-[#444] truncate" style={{ fontFamily: "'DM Mono', monospace" }}>{ch.channel_id}</p>
-                      </div>
-                      <div className={`w-4 h-4 rounded-full border flex items-center justify-center flex-shrink-0 transition-all ${chaineSelectionnee?.id === ch.id ? 'border-[#c0392b] bg-[#c0392b] text-white' : 'border-[#2a2a2a]'}`}>
-                        {chaineSelectionnee?.id === ch.id && <svg width="8" height="8" viewBox="0 0 8 8"><path d="M1.5 4L3 5.5 6.5 2" stroke="white" strokeWidth="1.2" strokeLinecap="round"/></svg>}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </Field>
+          <div className="space-y-5">
 
-            <Field label="Date de publication" optional hint="Laisser vide pour publier immédiatement">
-              <input type="datetime-local" value={datePublication} onChange={e => setDatePublication(e.target.value)} className={inputCls} />
-            </Field>
+            {/* Info banner */}
+            <div className="flex items-start gap-3 px-4 py-3.5 bg-amber-500/8 border border-amber-500/20 rounded-xl">
+              <svg width="15" height="15" viewBox="0 0 15 15" fill="none" className="text-amber-400 flex-shrink-0 mt-0.5"><circle cx="7.5" cy="7.5" r="6" stroke="currentColor" strokeWidth="1.3"/><path d="M7.5 5v3.5M7.5 10v.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/></svg>
+              <div>
+                <p className="text-[12px] text-amber-400 font-medium mb-0.5">Génération uniquement</p>
+                <p className="text-[11px] text-amber-400/60 leading-relaxed">La vidéo sera générée et disponible dans ta bibliothèque. Tu pourras la publier sur YouTube manuellement depuis le menu <strong className="text-amber-400/80">···</strong> de chaque vidéo.</p>
+              </div>
+            </div>
 
             {/* Récap */}
-            <div className="border border-[#1a1a1a] rounded-lg overflow-hidden">
-              <div className="px-4 py-2.5 border-b border-[#1a1a1a] bg-[#0d0d0d]">
+            <div className="border border-[#1a1a1a] rounded-xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-[#1a1a1a] bg-[#0a0a0a]">
                 <span className="text-[11px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Récapitulatif</span>
               </div>
-              <div className="divide-y divide-[#141414]">
+              <div className="divide-y divide-[#111]">
                 {[
-                  ['Durée', duree === '60' ? '1 min' : duree === '180' ? '3 min' : '10 min'],
-                  ['Avatar', selectedAvatarObj?.avatar_name || avatarId || '—'],
-                  ['Voix', selectedVoiceObj?.name || voiceId || '—'],
-                  ['Titre', titre || 'Généré par l\'IA'],
-                  ['Chaîne', chaineSelectionnee?.channel_name || <span className="text-amber-500">Non sélectionnée</span>],
-                  ['Publication', datePublication || 'Immédiate'],
-                ].map(([k, v], i) => (
-                  <div key={i} className="flex justify-between items-center px-4 py-2.5">
-                    <span className="text-[11px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>{k}</span>
-                    <span className="text-[12px] text-[#777] truncate max-w-[250px] text-right">{v}</span>
+                  { label: 'Avatar', value: selectedAvatarObj?.avatar_name || avatarId || '—', icon: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><circle cx="6.5" cy="4.5" r="2.5" stroke="currentColor" strokeWidth="1.2"/><path d="M1.5 11.5c0-2.76 2.24-5 5-5s5 2.24 5 5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
+                  { label: 'Voix', value: selectedVoiceObj?.name || voiceId || '—', icon: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><rect x="4" y="1" width="5" height="6" rx="2.5" stroke="currentColor" strokeWidth="1.2"/><path d="M2 6.5a4.5 4.5 0 009 0M6.5 11v1.5" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
+                  { label: 'Script', value: contenu ? `${contenu.split(' ').length} mots` : '—', icon: <svg width="13" height="13" viewBox="0 0 13 13" fill="none"><path d="M2 3h9M2 6h6M2 9h7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg> },
+                ].map(({ label, value, icon }) => (
+                  <div key={label} className="flex items-center justify-between px-4 py-3">
+                    <div className="flex items-center gap-2.5 text-[#555]">
+                      {icon}
+                      <span className="text-[11px]" style={{ fontFamily: "'DM Mono', monospace" }}>{label}</span>
+                    </div>
+                    <span className="text-[12px] text-[#888] truncate max-w-[200px] text-right">{value}</span>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="flex gap-2">
-              <Btn variant="ghost" onClick={() => setEtape('avatar')}>{Icon.arrowLeft} Retour</Btn>
-              <Btn onClick={lancerGeneration} disabled={loading || !chaineSelectionnee} className="flex-1 justify-center">
-                {loading ? 'Lancement...' : <>Lancer la génération {Icon.arrow}</>}
-              </Btn>
+            {/* Pipeline visuel */}
+            <div className="flex items-center gap-2 px-4 py-3.5 bg-[#0a0a0a] border border-[#1a1a1a] rounded-xl">
+              {[
+                { label: 'Script IA', color: 'text-violet-400 bg-violet-400/10 border-violet-400/20' },
+                { label: 'Heygen', color: 'text-amber-400 bg-amber-400/10 border-amber-400/20' },
+                { label: 'Prête ✓', color: 'text-emerald-400 bg-emerald-400/10 border-emerald-400/20' },
+              ].map((step, i, arr) => (
+                <div key={step.label} className="flex items-center gap-2 flex-1">
+                  <div className={`flex-1 text-center text-[10px] font-medium px-2 py-1.5 rounded-lg border ${step.color}`} style={{ fontFamily: "'DM Mono', monospace" }}>
+                    {step.label}
+                  </div>
+                  {i < arr.length - 1 && (
+                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" className="text-[#333] flex-shrink-0"><path d="M2 5h6M6 3l2 2-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  )}
+                </div>
+              ))}
             </div>
-            {!chaineSelectionnee && <p className="text-[11px] text-amber-600 text-center">Sélectionne une chaîne pour continuer</p>}
+
+            <div className="flex gap-2 pt-1">
+              <Btn variant="ghost" onClick={() => setEtape('avatar')}>{Icon.arrowLeft} Retour</Btn>
+              <button
+                onClick={lancerGeneration}
+                disabled={loading}
+                className="flex-1 flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-40 disabled:cursor-not-allowed rounded-xl transition-all group"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
+                    {loading
+                      ? <div className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+                      : <svg width="15" height="15" viewBox="0 0 15 15" fill="none"><path d="M7.5 1.5L9 6H13.5L9.75 8.75L11.25 13.5L7.5 10.75L3.75 13.5L5.25 8.75L1.5 6H6L7.5 1.5Z" stroke="white" strokeWidth="1.3" strokeLinejoin="round"/></svg>
+                    }
+                  </div>
+                  <div className="text-left">
+                    <p className="text-[13px] font-semibold text-white">{loading ? 'Lancement en cours...' : 'Générer la vidéo'}</p>
+                    <p className="text-[11px] text-white/60">Sans publication automatique</p>
+                  </div>
+                </div>
+                {!loading && <span className="text-white/70 group-hover:translate-x-0.5 transition-transform">{Icon.arrow}</span>}
+              </button>
+            </div>
           </div>
         )}
       </div>
