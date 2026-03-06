@@ -607,23 +607,31 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                   {/* Vignette 16/9 */}
                   <div className="relative rounded-t-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
 
-                    {/* ── VIDÉO PRÊTE : bouton play qui ouvre le lecteur modal ── */}
+                    {/* ── VIDÉO PRÊTE : miniature + bouton play par-dessus ── */}
                     {isReady && v.thumbnail_url ? (
                       <button
                         onClick={() => setPlayingVideo({ url: v.thumbnail_url, titre: v.titre })}
-                        className="block w-full h-full group/play">
-                        <div className="w-full h-full bg-[#0d0d0d] flex items-center justify-center relative">
-                          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-transparent" />
-                          <div className="relative flex flex-col items-center gap-2">
-                            <div className="w-12 h-12 rounded-full bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center group-hover/play:bg-emerald-500/40 group-hover/play:scale-110 transition-all duration-200">
-                              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                                <path d="M7 4l10 6-10 6V4Z" fill="#10b981"/>
-                              </svg>
-                            </div>
-                            <span className="text-[10px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
-                              Lire la vidéo
-                            </span>
+                        className="block w-full h-full group/play relative">
+                        {/* Miniature vidéo */}
+                        <video
+                          src={v.thumbnail_url}
+                          className="w-full h-full object-cover"
+                          muted
+                          preload="metadata"
+                          onMouseEnter={e => { e.currentTarget.currentTime = 1 }}
+                        />
+                        {/* Overlay sombre + bouton play centré */}
+                        <div className="absolute inset-0 bg-black/30 group-hover/play:bg-black/50 transition-all duration-200 flex items-center justify-center">
+                          <div className="w-11 h-11 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm flex items-center justify-center group-hover/play:scale-110 group-hover/play:bg-white/20 transition-all duration-200 shadow-lg">
+                            <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                              <path d="M6 3.5l9 5.5-9 5.5V3.5Z" fill="white"/>
+                            </svg>
                           </div>
+                        </div>
+                        {/* Badge "Prête" en bas à gauche */}
+                        <div className="absolute bottom-2 left-2 flex items-center gap-1.5 bg-black/60 backdrop-blur-sm border border-emerald-500/30 px-2 py-1 rounded-lg">
+                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 flex-shrink-0" />
+                          <span className="text-[10px] text-emerald-400 font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>Prête</span>
                         </div>
                       </button>
                     ) : v.thumbnail_url ? (
