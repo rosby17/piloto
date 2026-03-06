@@ -218,15 +218,19 @@ export async function POST(request) {
       chaineData = data
     }
 
-    // Crée l'entrée vidéo en base
+    // Crée l'entrée vidéo en base — colonnes confirmées
     const insertPayload = {
       user_id: userId,
-      channel_id: chaineData?.channel_id || null,
       script: contenu,
       duree: parseInt(duree) || 60,
+      titre: titreManuel || null,
+      description: descriptionManuelle || null,
+      avatar_id: avatarId,
+      voice_id: voiceId,
       statut: scriptDirect ? 'generation_video' : 'generation_script',
     }
-    // Ajoute date_publication seulement si fournie (évite erreur colonne nullable)
+    // channel_id seulement si fourni (peut avoir contrainte NOT NULL)
+    if (chaineData?.channel_id) insertPayload.channel_id = chaineData.channel_id
     if (datePublication) insertPayload.date_publication = datePublication
 
     const { data: video, error: videoError } = await supabase
@@ -301,11 +305,11 @@ async function runPipeline({
     description = description || meta.description
   }
 
-  // Update only fields that exist — titre/description may not be columns
+  // Update titre/description si générés par IA
   try {
     await update('meta_pret', { titre, description })
   } catch (e) {
-    console.error('[pipeline] meta_pret update failed (columns may not exist):', e.message)
+    console.error('[pipeline] meta_pret update failed:', e.message)
     await update('meta_pret')
   }
 
@@ -317,11 +321,11 @@ async function runPipeline({
   const heygenVideoId = await creerVideoHeygen(script, avatarId, voiceId, heygenKey)
   console.log(`[pipeline] HeyGen video_id: ${heygenVideoId}`)
 
-  // Try to update with heygen_video_id — column may not exist
+  // Try to update with heygen_video_id
   try {
     await update('video_en_cours', { heygen_video_id: heygenVideoId })
   } catch (e) {
-    console.error('[pipeline] heygen_video_id column missing:', e.message)
+    console.error('[pipeline] heygen_video_id update failed:', e.message)
     await update('video_en_cours')
   }
 
@@ -332,12 +336,7 @@ async function runPipeline({
 
   // ── Arrêt après HeyGen (publication manuelle) ──────────────
   if (stopAfterVideo) {
-    try {
-      await update('publiee', { thumbnail_url: videoUrl })
-    } catch (e) {
-      console.error('[pipeline] thumbnail_url column missing:', e.message)
-      await update('publiee')
-    }
+    await update('publiee', { video_url: videoUrl })
     console.log(`[pipeline] done — stopped after HeyGen`)
     return
   }
@@ -349,11 +348,6 @@ async function runPipeline({
   })
 
   const statut = datePublication ? 'programmee' : 'publiee'
-  try {
-    await update(statut, { youtube_video_id: youtubeVideoId, thumbnail_url: videoUrl })
-  } catch (e) {
-    console.error('[pipeline] final update failed:', e.message)
-    await update(statut)
-  }
+  await update(statut, { youtube_video_id: youtubeVideoId, video_url: videoUrl })
   console.log(`[pipeline] done — YouTube id: ${youtubeVideoId}`)
 }
