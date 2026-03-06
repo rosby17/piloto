@@ -239,9 +239,10 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
   const [saving, setSaving] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
+  const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
   const [renamingVideo, setRenamingVideo] = useState(null)
   const [renameValue, setRenameValue] = useState('')
-  // ── NOUVEAU : état pour le lecteur vidéo modal ──
+  // ── état pour le lecteur vidéo modal ──
   const [playingVideo, setPlayingVideo] = useState(null) // { url, titre }
   const intervalRef = useRef(null)
   const pollingRef = useRef({})
@@ -582,6 +583,93 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           </div>
         )}
 
+        {/* ── Menu portal fixe ── */}
+        {openMenuId && (() => {
+          const v = videos.find(vid => vid.id === openMenuId)
+          if (!v) return null
+          return (
+            <>
+              <div className="fixed inset-0 z-[998]" onClick={() => setOpenMenuId(null)} />
+              <div
+                className="fixed z-[999] w-56 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/80 py-1"
+                style={{ right: window.innerWidth - menuPos.x, top: menuPos.y - 8, transform: 'translateY(-100%)' }}
+                onClick={e => e.stopPropagation()}>
+                <div className="px-3.5 py-2 border-b border-[#1e1e1e] mb-1">
+                  <p className="text-[10px] text-[#555] truncate" style={{ fontFamily: "'DM Mono', monospace" }}>{v.titre || 'Vidéo'}</p>
+                </div>
+                <button
+                  onClick={() => {
+                    setOpenMenuId(null)
+                    sessionStorage.setItem('piloto_studio_video_id', v.id)
+                    sessionStorage.setItem('piloto_studio_script', v.script || v.contenu || '')
+                    sessionStorage.setItem('piloto_studio_title', v.titre || '')
+                    sessionStorage.setItem('piloto_studio_avatar_id', v.avatar_id || '')
+                    sessionStorage.setItem('piloto_studio_voice_id', v.voice_id || '')
+                    router.push('/dashboard/studio')
+                  }}
+                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#c0392b] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left font-medium">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
+                  Éditer dans Studio
+                </button>
+                <div className="border-t border-[#1e1e1e] my-1" />
+                {v.thumbnail_url ? (
+                  <button onClick={() => { setPlayingVideo({ url: v.thumbnail_url, titre: v.titre }); setOpenMenuId(null) }}
+                    className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-emerald-400 hover:text-white hover:bg-[#1e1e1e] transition w-full text-left font-medium">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 4.5l5 2.5-5 2.5V4.5Z" fill="currentColor"/></svg>
+                    Lire la vidéo
+                  </button>
+                ) : (
+                  <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 4.5l5 2.5-5 2.5V4.5Z" fill="currentColor"/></svg>
+                    Vidéo en cours...
+                  </div>
+                )}
+                {v.thumbnail_url ? (
+                  <a href={v.thumbnail_url} download onClick={() => setOpenMenuId(null)}
+                    className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> Télécharger
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
+                    <svg width="13" height="13" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg> Télécharger (en cours...)
+                  </div>
+                )}
+                {v.youtube_video_id ? (
+                  <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
+                    onClick={() => setOpenMenuId(null)}
+                    className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
+                    Voir sur YouTube
+                  </a>
+                ) : (
+                  <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
+                    <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
+                    Publier sur YouTube
+                  </div>
+                )}
+                <div className="border-t border-[#1e1e1e] my-1" />
+                <button onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
+                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 11h2.5L11 4.5a1.4 1.4 0 00-2-2L2.5 9V11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 2.5l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  Renommer
+                </button>
+                <button onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
+                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                  Modifier titre/desc
+                </button>
+                <div className="border-t border-[#1e1e1e] my-1" />
+                <button onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }}
+                  disabled={deletingId === v.id}
+                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3.5 4l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                  {deletingId === v.id ? 'Suppression...' : 'Supprimer'}
+                </button>
+              </div>
+            </>
+          )
+        })()}
+
         {videos.length === 0 ? (
           <div className="flex flex-col items-center gap-5 py-24 border border-dashed border-[#1a1a1a] rounded-2xl">
             <div className="w-14 h-14 rounded-2xl border border-[#1e1e1e] bg-[#0d0d0d] flex items-center justify-center text-[#2a2a2a]">{Icon.film}</div>
@@ -698,114 +786,21 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                         </span>
 
                         {/* Menu "..." */}
-                        <div className="relative">
-                          <button
-                            onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : v.id) }}
-                            className={`w-6 h-6 rounded-md flex items-center justify-center transition ${isMenuOpen ? 'bg-[#2a2a2a] text-white' : 'text-[#444] hover:text-[#aaa] hover:bg-[#1a1a1a]'}`}>
-                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                              <circle cx="2.5" cy="6.5" r="1" fill="currentColor"/>
-                              <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
-                              <circle cx="10.5" cy="6.5" r="1" fill="currentColor"/>
-                            </svg>
-                          </button>
-
-                          {isMenuOpen && (
-                            <div
-                              className="absolute z-[999] w-56 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/80 py-1"
-                              style={{ bottom: '100%', right: 0, marginBottom: '6px' }}
-                              onClick={e => e.stopPropagation()}>
-
-                              <div className="px-3.5 py-2 border-b border-[#1e1e1e] mb-1">
-                                <p className="text-[10px] text-[#444] truncate" style={{ fontFamily: "'DM Mono', monospace" }}>{v.titre || 'Vidéo'}</p>
-                              </div>
-
-                              {/* Éditer dans Studio */}
-                              <button
-                                onClick={() => {
-                                  setOpenMenuId(null)
-                                  sessionStorage.setItem('piloto_studio_video_id', v.id)
-                                  sessionStorage.setItem('piloto_studio_script', v.script || '')
-                                  sessionStorage.setItem('piloto_studio_title', v.titre || '')
-                                  router.push('/dashboard/studio')
-                                }}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#c0392b] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left font-medium">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="2" width="12" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 5.5l3.5 2L5 9V5.5Z" fill="currentColor"/></svg>
-                                Éditer dans Studio
-                              </button>
-
-                              <div className="border-t border-[#1e1e1e] my-1" />
-
-                              {/* Lire la vidéo */}
-                              {v.thumbnail_url ? (
-                                <button
-                                  onClick={() => { setPlayingVideo({ url: v.thumbnail_url, titre: v.titre }); setOpenMenuId(null) }}
-                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-emerald-400 hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer font-medium w-full text-left">
-                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 4.5l5 2.5-5 2.5V4.5Z" fill="currentColor"/></svg>
-                                  Lire la vidéo
-                                </button>
-                              ) : (
-                                <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
-                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><circle cx="7" cy="7" r="6" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 4.5l5 2.5-5 2.5V4.5Z" fill="currentColor"/></svg>
-                                  Vidéo en cours...
-                                </div>
-                              )}
-
-                              {/* Télécharger */}
-                              {v.thumbnail_url ? (
-                                <a href={v.thumbnail_url} download
-                                  onClick={() => setOpenMenuId(null)}
-                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
-                                  {Icon.download} Télécharger
-                                </a>
-                              ) : (
-                                <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
-                                  {Icon.download} Télécharger (en cours...)
-                                </div>
-                              )}
-
-                              {/* YouTube */}
-                              {v.youtube_video_id ? (
-                                <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
-                                  onClick={() => setOpenMenuId(null)}
-                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
-                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
-                                  Voir sur YouTube
-                                </a>
-                              ) : (
-                                <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
-                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
-                                  Publier sur YouTube
-                                </div>
-                              )}
-
-                              <div className="border-t border-[#1e1e1e] my-1" />
-
-                              <button
-                                onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 11h2.5L11 4.5a1.4 1.4 0 00-2-2L2.5 9V11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 2.5l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                                Renommer
-                              </button>
-
-                              <button
-                                onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                                Modifier titre/desc
-                              </button>
-
-                              <div className="border-t border-[#1e1e1e] my-1" />
-
-                              <button
-                                onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }}
-                                disabled={deletingId === v.id}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3.5 4l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                {deletingId === v.id ? 'Suppression...' : 'Supprimer'}
-                              </button>
-                            </div>
-                          )}
-                        </div>
+                        <button
+                          onClick={e => {
+                            e.stopPropagation()
+                            if (isMenuOpen) { setOpenMenuId(null); return }
+                            const rect = e.currentTarget.getBoundingClientRect()
+                            setMenuPos({ x: rect.right, y: rect.top })
+                            setOpenMenuId(v.id)
+                          }}
+                          className={`w-6 h-6 rounded-md flex items-center justify-center transition ${isMenuOpen ? 'bg-[#2a2a2a] text-white' : 'text-[#444] hover:text-[#aaa] hover:bg-[#1a1a1a]'}`}>
+                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                            <circle cx="2.5" cy="6.5" r="1" fill="currentColor"/>
+                            <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+                            <circle cx="10.5" cy="6.5" r="1" fill="currentColor"/>
+                          </svg>
+                        </button>
                       </div>
                     </div>
                   </div>
