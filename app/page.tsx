@@ -2,6 +2,8 @@ import PricingSection from './components/PricingSection'
 
 export const dynamic = 'force-dynamic'
 
+
+
 const Icon = {
   plane: (
     <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
