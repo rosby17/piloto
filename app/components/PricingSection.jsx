@@ -1,6 +1,3 @@
-// Remplace la section {/* ── TARIFS ── */} dans app/page.jsx
-// Colle ce composant directement à la place, ou importe-le
-
 'use client'
 
 import { useState } from 'react'
@@ -18,20 +15,46 @@ const IconSpinner = (
 )
 
 const PLANS = [
-  // ...
+  {
+    name: 'Gratuit',
+    price: '0',
+    priceId: null,
+    amount: 0,
+    currency: 'XOF',
+    features: ['3 vidéos/mois', '1 chaîne YouTube', 'Script IA basique', 'Miniature auto'],
+    cta: 'Commencer',
+    highlight: false,
+  },
   {
     name: 'Starter',
+    price: '9',
     priceId: 'starter_monthly',
-    amount: 90000,   // 90 000 GNF ≈ 9€
+    amount: 90000,
     currency: 'GNF',
-    // ...
+    features: ['15 vidéos/mois', '2 chaînes YouTube', 'Script IA avancé', 'Import PDF/URL', 'Support email'],
+    cta: 'Choisir Starter',
+    highlight: false,
   },
   {
     name: 'Pro',
+    price: '29',
     priceId: 'pro_monthly',
-    amount: 290000,  // 290 000 GNF ≈ 29€
+    amount: 290000,
     currency: 'GNF',
-    // ...
+    features: ['50 vidéos/mois', '5 chaînes YouTube', 'Script IA premium', 'Miniature HD', 'Support prioritaire', 'Analytics'],
+    cta: 'Choisir Pro',
+    highlight: true,
+  },
+  {
+    name: 'Agency',
+    price: '99',
+    priceId: null,
+    amount: 0,
+    currency: 'GNF',
+    features: ['Illimité', 'Chaînes illimitées', 'API access', 'White label', 'Account manager'],
+    cta: 'Contacter',
+    highlight: false,
+    isContact: true,
   },
 ]
 
@@ -67,7 +90,7 @@ export default function PricingSection() {
       const data = await res.json()
 
       if (!res.ok || !data.checkout_url) {
-        throw new Error(data.error || 'Erreur lors de l\'initialisation du paiement')
+        throw new Error(data.error || "Erreur lors de l'initialisation du paiement")
       }
 
       window.location.href = data.checkout_url
