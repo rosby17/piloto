@@ -1,6 +1,6 @@
-
 import PricingSection from './components/PricingSection'
 
+export const dynamic = 'force-dynamic'
 
 const Icon = {
   plane: (
@@ -98,11 +98,15 @@ export default function Home() {
         </a>
 
         <div className="hidden md:flex items-center gap-8">
-          {['#comment', '#fonctionnalites', '#tarifs'].map((href, i) => (
-            <a key={i} href={href}
+          {[
+            { href: '#comment', label: 'Comment' },
+            { href: '#fonctionnalites', label: 'Fonctionnalités' },
+            { href: '#tarifs', label: 'Tarifs' },
+          ].map((item) => (
+            <a key={item.href} href={item.href}
               className="text-[13px] text-[#555] hover:text-white transition"
               style={{ fontFamily: "'DM Mono', monospace" }}>
-              {['Comment', 'Fonctionnalités', 'Tarifs'][i]}
+              {item.label}
             </a>
           ))}
         </div>
@@ -120,12 +124,10 @@ export default function Home() {
 
       {/* ── HERO ────────────────────────────────────────── */}
       <section className="pt-36 pb-28 px-8 relative overflow-hidden">
-        {/* Subtle grid */}
         <div className="absolute inset-0 pointer-events-none" style={{
           backgroundImage: 'linear-gradient(rgba(192,57,43,0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(192,57,43,0.03) 1px, transparent 1px)',
           backgroundSize: '60px 60px'
         }} />
-        {/* Glow */}
         <div className="absolute top-20 left-1/2 -translate-x-1/2 w-[500px] h-[400px] bg-[#c0392b]/6 rounded-full blur-[100px] pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto">
@@ -199,12 +201,12 @@ export default function Home() {
             {[
               {
                 n: '01', icon: Icon.source, title: 'Source du contenu',
-                desc: 'Envoie un lien YouTube, un fichier PDF/TXT ou colle ton script. Piloto s\'adapte à toutes les sources.',
+                desc: "Envoie un lien YouTube, un fichier PDF/TXT ou colle ton script. Piloto s'adapte à toutes les sources.",
                 tags: ['URL YouTube', 'PDF', 'TXT', 'Texte libre'],
               },
               {
                 n: '02', icon: Icon.ai, title: 'Script IA viral',
-                desc: 'Notre IA reformule ton contenu en script optimisé pour maximiser l\'engagement — court, moyen ou long.',
+                desc: "Notre IA reformule ton contenu en script optimisé pour maximiser l'engagement — court, moyen ou long.",
                 tags: ['Script optimisé', 'Durée personnalisable', 'Ton ajustable'],
               },
               {
@@ -261,7 +263,7 @@ export default function Home() {
           <div className="grid md:grid-cols-3 gap-3">
             {[
               { icon: Icon.source, title: 'Toutes les sources', desc: 'Lien, PDF, TXT ou texte libre. Piloto extrait et reformule le contenu automatiquement.' },
-              { icon: Icon.ai, title: 'Script IA viral', desc: 'Script optimisé pour maximiser l\'engagement selon la durée et le ton que tu choisis.' },
+              { icon: Icon.ai, title: 'Script IA viral', desc: "Script optimisé pour maximiser l'engagement selon la durée et le ton que tu choisis." },
               { icon: Icon.video, title: 'Avatar Heygen', desc: 'Connecte ton compte Heygen et utilise ton propre avatar avec la voix de ton choix.' },
               { icon: Icon.image, title: 'Miniature HD', desc: 'Génération automatique ou upload de la tienne. Format optimisé pour YouTube.' },
               { icon: Icon.seo, title: 'Publication auto', desc: 'Titre SEO, description et date de publication configurés automatiquement.' },
@@ -280,10 +282,7 @@ export default function Home() {
       </section>
 
       {/* ── TARIFS ──────────────────────────────────────── */}
-
       <PricingSection />
-
-
 
       {/* ── CTA FINAL ───────────────────────────────────── */}
       <section className="py-28 px-8 border-t border-[#131313] relative overflow-hidden">
