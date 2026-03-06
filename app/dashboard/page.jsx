@@ -37,6 +37,7 @@ const STATUTS = {
   generation_video:  { label: 'Envoi Heygen',       color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
   video_en_cours:    { label: 'Heygen en cours',    color: 'text-amber-400',   bg: 'bg-amber-400/8 border-amber-400/15',   pulse: true  },
   upload_youtube:    { label: 'Upload YouTube',     color: 'text-orange-400',  bg: 'bg-orange-400/8 border-orange-400/15', pulse: true  },
+  video_prete:       { label: 'Vidéo prête',        color: 'text-green-400',   bg: 'bg-green-400/8 border-green-400/15',   pulse: false },
   publiee:           { label: 'Publiée',            color: 'text-emerald-400', bg: 'bg-emerald-400/8 border-emerald-400/15', pulse: false },
   programmee:        { label: 'Programmée',         color: 'text-sky-400',     bg: 'bg-sky-400/8 border-sky-400/15',       pulse: false },
   erreur:            { label: 'Erreur',             color: 'text-red-400',     bg: 'bg-red-400/8 border-red-400/15',       pulse: false },
@@ -276,7 +277,18 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     setDeletingId(null); fetchVideos()
   }
 
-  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret'].includes(v.statut))
+  const publierVideo = async (video) => {
+    if (!confirm('Publier cette vidéo sur YouTube maintenant ?')) return
+    await supabase.from('videos').update({ statut: 'upload_youtube' }).eq('id', video.id)
+    fetchVideos()
+    fetch('/api/publish', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ videoId: video.id, userId: user.id }),
+    }).then(() => fetchVideos())
+  }
+
+  const hasActive = videos.some(v => !['publiee', 'erreur', 'programmee', 'script_pret', 'video_prete'].includes(v.statut))
 
   // ── Config visuelle par statut ──────────────────────────
   const getStatusOverlay = (statut) => {
@@ -334,6 +346,8 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
           glowColor: '#f97316',
           pulse: true,
         }
+      case 'video_prete':
+        return { label: null, badge: 'bg-green-500/20 text-green-400', dot: 'bg-green-400', glowColor: null, pulse: false }
       case 'publiee':
         return { label: null, badge: 'bg-emerald-500/20 text-emerald-400', dot: 'bg-emerald-400', glowColor: null, pulse: false }
       case 'programmee':
@@ -357,7 +371,7 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
     const map = {
       en_attente: 'En attente', generation_script: 'Script IA', script_pret: 'Draft',
       generation_meta: 'Métadonnées', meta_pret: 'Prêt', generation_video: 'En file',
-      video_en_cours: 'Heygen', upload_youtube: 'Upload', publiee: 'Publiée',
+      video_en_cours: 'Heygen', upload_youtube: 'Upload', video_prete: 'Vidéo prête', publiee: 'Publiée',
       programmee: 'Programmée', erreur: 'Erreur',
     }
     return map[statut] || statut
@@ -510,7 +524,8 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
             {videos.map(v => {
               const overlay = getStatusOverlay(v.statut)
               const isActive = overlay.pulse
-              const isDone = ['publiee', 'programmee'].includes(v.statut)
+              const isDone = ['publiee', 'programmee', 'video_prete'].includes(v.statut)
+              const isReadyToPublish = v.statut === 'video_prete'
               const isError = v.statut === 'erreur'
               const isDraft = v.statut === 'script_pret'
 
@@ -615,6 +630,13 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
                                 Voir sur YouTube
                               </a>
+                            ) : isReadyToPublish ? (
+                              <button
+                                onClick={() => { publierVideo(v); setOpenMenuId(null) }}
+                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-green-400 hover:text-white hover:bg-green-500/10 transition w-full text-left">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
+                                Publier sur YouTube
+                              </button>
                             ) : (
                               <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed">
                                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
