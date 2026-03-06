@@ -517,12 +517,10 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
               const isMenuOpen = openMenuId === v.id
 
               return (
-                <div key={v.id}
-                  className="group relative flex flex-col rounded-xl overflow-hidden border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40"
-                  onClick={() => openMenuId && setOpenMenuId(null)}>
+                <div key={v.id} className="group relative flex flex-col rounded-xl border border-[#1a1a1a] bg-[#0a0a0a] hover:border-[#2a2a2a] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-xl hover:shadow-black/40">
 
-                  {/* ── Vignette 16/9 ── */}
-                  <div className="relative overflow-hidden" style={{ aspectRatio: '16/9' }}>
+                  {/* ── Vignette 16/9 — overflow-hidden isolé ── */}
+                  <div className="relative rounded-t-xl overflow-hidden" style={{ aspectRatio: '16/9' }}>
                     {v.thumbnail_url ? (
                       <img src={v.thumbnail_url} alt={v.titre} className="w-full h-full object-cover" />
                     ) : (
@@ -541,14 +539,12 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Badge Draft */}
-                    {isDraft && (
+                    {/* Badge top-left : Draft ou Erreur — sur la vignette seulement */}
+                    {isDraft && !isActive && (
                       <div className="absolute top-2 left-2 bg-[#1a1a1a]/90 backdrop-blur-sm border border-[#333] text-[#888] text-[10px] px-2.5 py-1 rounded-lg font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
                         Draft
                       </div>
                     )}
-
-                    {/* Badge erreur */}
                     {isError && (
                       <div className="absolute top-2 left-2 bg-red-500/20 backdrop-blur-sm border border-red-500/30 text-red-400 text-[10px] px-2.5 py-1 rounded-lg font-medium" style={{ fontFamily: "'DM Mono', monospace" }}>
                         Erreur
@@ -562,95 +558,14 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       </div>
                     )}
 
-                    {/* Boutons top-right : edit + menu "..." */}
-                    <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
+                    {/* Bouton edit top-right (sur vignette) */}
+                    <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity duration-150">
                       <button
                         onClick={e => { e.stopPropagation(); ouvrirEdit(v) }}
                         className="w-7 h-7 rounded-lg bg-black/70 backdrop-blur-sm border border-white/10 flex items-center justify-center text-[#ccc] hover:text-white transition"
-                        title="Éditer">
+                        title="Modifier">
                         <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
                       </button>
-                      <div className="relative">
-                        <button
-                          onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : v.id) }}
-                          className={`w-7 h-7 rounded-lg backdrop-blur-sm border flex items-center justify-center transition ${isMenuOpen ? 'bg-white/15 border-white/20 text-white' : 'bg-black/70 border-white/10 text-[#ccc] hover:text-white'}`}>
-                          <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
-                            <circle cx="2.5" cy="6.5" r="1" fill="currentColor"/>
-                            <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
-                            <circle cx="10.5" cy="6.5" r="1" fill="currentColor"/>
-                          </svg>
-                        </button>
-
-                        {/* Dropdown menu */}
-                        {isMenuOpen && (
-                          <div
-                            className="absolute top-9 right-0 z-50 w-48 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/60 overflow-hidden py-1"
-                            onClick={e => e.stopPropagation()}>
-
-                            {/* Créé par */}
-                            <div className="px-3.5 py-2.5 border-b border-[#1e1e1e]">
-                              <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar Video</p>
-                            </div>
-
-                            {/* Download */}
-                            {v.thumbnail_url ? (
-                              <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
-                                onClick={() => setOpenMenuId(null)}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Télécharger
-                              </a>
-                            ) : (
-                              <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                                Télécharger
-                              </div>
-                            )}
-
-                            {/* Publier YouTube */}
-                            {v.youtube_video_id ? (
-                              <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
-                                onClick={() => setOpenMenuId(null)}
-                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
-                                Voir sur YouTube
-                              </a>
-                            ) : (
-                              <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed">
-                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
-                                Publier sur YouTube
-                              </div>
-                            )}
-
-                            {/* Renommer */}
-                            <button
-                              onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
-                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 11h2.5L11 4.5a1.4 1.4 0 00-2-2L2.5 9V11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 2.5l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                              Renommer
-                            </button>
-
-                            {/* Éditer métadonnées */}
-                            <button
-                              onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
-                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#aaa] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
-                              Modifier
-                            </button>
-
-                            <div className="border-t border-[#1e1e1e] my-1" />
-
-                            {/* Supprimer */}
-                            <button
-                              onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }}
-                              disabled={deletingId === v.id}
-                              className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
-                              <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3.5 4l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
-                              {deletingId === v.id ? 'Suppression...' : 'Supprimer'}
-                            </button>
-                          </div>
-                        )}
-                      </div>
                     </div>
                   </div>
 
@@ -663,10 +578,96 @@ function MesVideos({ user, onNouvelleVideo, onGoToParams }) {
                       <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
                         {new Date(v.created_at).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}
                       </span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${overlay.badge}`} style={{ fontFamily: "'DM Mono', monospace" }}>
-                        {overlay.pulse && <span className={`w-1 h-1 rounded-full pulse-dot flex-shrink-0 ${overlay.dot}`} />}
-                        {getStatusLabel(v.statut)}
-                      </span>
+
+                      {/* Badge statut + bouton "..." dans le bas de card — pas de overflow-hidden ici */}
+                      <div className="flex items-center gap-1.5">
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-medium flex items-center gap-1 ${overlay.badge}`} style={{ fontFamily: "'DM Mono', monospace" }}>
+                          {overlay.pulse && <span className={`w-1 h-1 rounded-full pulse-dot flex-shrink-0 ${overlay.dot}`} />}
+                          {getStatusLabel(v.statut)}
+                        </span>
+
+                        {/* Menu "..." — positionné ici pour éviter overflow-hidden */}
+                        <div className="relative">
+                          <button
+                            onClick={e => { e.stopPropagation(); setOpenMenuId(isMenuOpen ? null : v.id) }}
+                            className={`w-6 h-6 rounded-md flex items-center justify-center transition ${isMenuOpen ? 'bg-[#2a2a2a] text-white' : 'text-[#444] hover:text-[#aaa] hover:bg-[#1a1a1a]'}`}>
+                            <svg width="13" height="13" viewBox="0 0 13 13" fill="none">
+                              <circle cx="2.5" cy="6.5" r="1" fill="currentColor"/>
+                              <circle cx="6.5" cy="6.5" r="1" fill="currentColor"/>
+                              <circle cx="10.5" cy="6.5" r="1" fill="currentColor"/>
+                            </svg>
+                          </button>
+
+                          {/* Dropdown — s'ouvre vers le haut */}
+                          {isMenuOpen && (
+                            <div
+                              className="absolute bottom-8 right-0 z-50 w-52 bg-[#141414] border border-[#2a2a2a] rounded-xl shadow-2xl shadow-black/80 py-1"
+                              onClick={e => e.stopPropagation()}>
+
+                              <div className="px-3.5 py-2 border-b border-[#1e1e1e] mb-1">
+                                <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>Avatar Video</p>
+                              </div>
+
+                              {/* Télécharger */}
+                              {v.thumbnail_url ? (
+                                <a href={v.thumbnail_url} target="_blank" rel="noopener noreferrer"
+                                  onClick={() => setOpenMenuId(null)}
+                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  Télécharger
+                                </a>
+                              ) : (
+                                <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M7 1v8M4 6l3 3 3-3M2 10v1.5a.5.5 0 00.5.5h9a.5.5 0 00.5-.5V10" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                  Télécharger
+                                </div>
+                              )}
+
+                              {/* YouTube */}
+                              {v.youtube_video_id ? (
+                                <a href={`https://youtube.com/watch?v=${v.youtube_video_id}`} target="_blank" rel="noopener noreferrer"
+                                  onClick={() => setOpenMenuId(null)}
+                                  className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition cursor-pointer">
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
+                                  Voir sur YouTube
+                                </a>
+                              ) : (
+                                <div className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#333] cursor-not-allowed select-none">
+                                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1" y="3" width="12" height="8" rx="2" stroke="currentColor" strokeWidth="1.2"/><path d="M5.5 5L9 7L5.5 9V5Z" fill="currentColor"/></svg>
+                                  Publier sur YouTube
+                                </div>
+                              )}
+
+                              {/* Renommer */}
+                              <button
+                                onClick={() => { setRenamingVideo(v); setRenameValue(v.titre || ''); setOpenMenuId(null) }}
+                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 11h2.5L11 4.5a1.4 1.4 0 00-2-2L2.5 9V11Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/><path d="M9 2.5l2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                                Renommer
+                              </button>
+
+                              {/* Modifier */}
+                              <button
+                                onClick={() => { ouvrirEdit(v); setOpenMenuId(null) }}
+                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#bbb] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="2" y="2" width="10" height="10" rx="1.5" stroke="currentColor" strokeWidth="1.2"/><path d="M5 7h4M7 5v4" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/></svg>
+                                Modifier
+                              </button>
+
+                              <div className="border-t border-[#1e1e1e] my-1" />
+
+                              {/* Supprimer */}
+                              <button
+                                onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }}
+                                disabled={deletingId === v.id}
+                                className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
+                                <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3.5 4l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
+                                {deletingId === v.id ? 'Suppression...' : 'Supprimer'}
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
                     </div>
                   </div>
                 </div>
