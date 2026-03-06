@@ -1152,7 +1152,7 @@ ${scriptBrut}`
 
                 {/* CTA principal — Aller dans Piloto Studio */}
                 <button
-                  onClick={() => { setContenu(scriptGenere); router.push(`/dashboard/studio?script=${encodeURIComponent(scriptGenere)}&title=${encodeURIComponent(titre || projectTitle || 'Nouveau projet')}`) }}
+                  onClick={() => { setContenu(scriptGenere); router.push(`/dashboard/studio?script=${encodeURIComponent(scriptGenere)}&title=${encodeURIComponent(titre || 'Nouveau projet')}`) }}
                   className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] rounded-xl transition-all group">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center flex-shrink-0">
@@ -1193,7 +1193,10 @@ ${scriptBrut}`
             </Field>
 
             <button
-              onClick={() => setEtape('avatar')}
+              onClick={() => {
+                if (!contenu.trim()) return
+                router.push(`/dashboard/studio?script=${encodeURIComponent(contenu)}&title=${encodeURIComponent('Nouveau projet')}`)
+              }}
               disabled={!contenu.trim()}
               className="w-full flex items-center justify-between px-5 py-4 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed rounded-xl transition-all group">
               <div className="flex items-center gap-3">
