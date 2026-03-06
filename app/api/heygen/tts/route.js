@@ -19,8 +19,6 @@ export async function POST(request) {
         voice_id:  voiceId,
         text:      script,
         text_type: 'plain',
-        speed,
-        pitch,
       }),
     })
 
