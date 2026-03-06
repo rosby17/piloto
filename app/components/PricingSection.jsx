@@ -18,46 +18,20 @@ const IconSpinner = (
 )
 
 const PLANS = [
-  {
-    name: 'Gratuit',
-    price: '0',
-    priceId: null,
-    amount: 0,
-    currency: 'XOF',
-    features: ['3 vidéos/mois', '1 chaîne YouTube', 'Script IA basique', 'Miniature auto'],
-    cta: 'Commencer',
-    highlight: false,
-  },
+  // ...
   {
     name: 'Starter',
-    price: '9',
     priceId: 'starter_monthly',
-    amount: 5900,   // ~9€ en XOF
-    currency: 'XOF',
-    features: ['15 vidéos/mois', '2 chaînes YouTube', 'Script IA avancé', 'Import PDF/URL', 'Support email'],
-    cta: 'Choisir Starter',
-    highlight: false,
+    amount: 90000,   // 90 000 GNF ≈ 9€
+    currency: 'GNF',
+    // ...
   },
   {
     name: 'Pro',
-    price: '29',
     priceId: 'pro_monthly',
-    amount: 19000,  // ~29€ en XOF
-    currency: 'XOF',
-    features: ['50 vidéos/mois', '5 chaînes YouTube', 'Script IA premium', 'Miniature HD', 'Support prioritaire', 'Analytics'],
-    cta: 'Choisir Pro',
-    highlight: true,
-  },
-  {
-    name: 'Agency',
-    price: '99',
-    priceId: null,
-    amount: 0,
-    currency: 'XOF',
-    features: ['Illimité', 'Chaînes illimitées', 'API access', 'White label', 'Account manager'],
-    cta: 'Contacter',
-    highlight: false,
-    isContact: true,
+    amount: 290000,  // 290 000 GNF ≈ 29€
+    currency: 'GNF',
+    // ...
   },
 ]
 
