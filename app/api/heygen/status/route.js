@@ -2,10 +2,6 @@
 // Rôle : checker le statut d'une vidéo HeyGen et mettre à jour Supabase si terminée
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
 
 export async function POST(request) {
   const { videoId, heygenVideoId, heygenKey } = await request.json()
