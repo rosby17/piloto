@@ -1,64 +1,80 @@
 // app/api/heygen/tts/route.js
-// ⚠️  HeyGen TTS direct (POST /v1/audio/text_to_speech) est réservé aux plans API payants (Pro/Scale/Enterprise).
 
-export async function POST(request) {
-  const { heygenKey, voiceId, script, speed = 1.0, pitch = 0 } = await request.json()
-
-  if (!heygenKey) return Response.json({ error: 'Clé HeyGen manquante' }, { status: 400 })
-  if (!voiceId)   return Response.json({ error: 'voiceId manquant' },      { status: 400 })
-  if (!script)    return Response.json({ error: 'Script manquant' },       { status: 400 })
-
+export async function POST(req) {
   try {
-    const res = await fetch('https://api.heygen.com/v1/audio/text_to_speech', {
+    const apiKey = process.env.HEYGEN_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'HEYGEN_API_KEY manquante' }, { status: 500 })
+    }
+
+    const { texte, voiceId, vitesse = 1.0, pitch = 0 } = await req.json()
+
+    if (!texte?.trim()) {
+      return Response.json({ error: 'Texte manquant' }, { status: 400 })
+    }
+    if (!voiceId) {
+      return Response.json({ error: 'voiceId manquant' }, { status: 400 })
+    }
+
+    // ── Étape 1 : créer la tâche TTS ──
+    const createRes = await fetch('https://api.heygen.com/v1/audio/tts', {
       method: 'POST',
       headers: {
-        'X-Api-Key':    heygenKey,
+        'X-Api-Key': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        text:     texte,
         voice_id: voiceId,
-        text:     script,
+        speed:    vitesse,
+        pitch:    pitch,
       }),
     })
 
-    const raw = await res.text()
-    console.log('[TTS] Status:', res.status)
-    console.log('[TTS] Réponse HeyGen:', raw.slice(0, 500))
+    const createData = await createRes.json()
+    console.log('TTS create response:', JSON.stringify(createData))
 
-    let data
-    try { data = JSON.parse(raw) } catch { data = {} }
+    // Selon la version de l'API HeyGen, la réponse peut être directe ou en polling
+    // Cas 1 : url directe dans la réponse
+    if (createData?.data?.url) {
+      return Response.json({ url: createData.data.url })
+    }
+    if (createData?.data?.audio_url) {
+      return Response.json({ url: createData.data.audio_url })
+    }
 
-    if (!res.ok) {
-      const heygenMsg = data?.message || data?.error?.message || String(data?.error || '')
-      let friendlyError = heygenMsg
+    // Cas 2 : task_id à poller
+    const taskId = createData?.data?.task_id || createData?.task_id
+    if (taskId) {
+      // Polling jusqu'à 30s
+      for (let i = 0; i < 20; i++) {
+        await new Promise(r => setTimeout(r, 1500))
 
-      if (res.status === 401 || res.status === 403) {
-        friendlyError = 'Clé HeyGen invalide ou accès refusé.'
-      } else if (res.status === 400) {
-        friendlyError = heygenMsg || 'Erreur 400 — vérifie que ton plan HeyGen supporte le TTS (Pro ou supérieur).'
-      } else if (res.status === 429) {
-        friendlyError = 'Limite de requêtes HeyGen atteinte. Réessaie dans quelques secondes.'
+        const statusRes = await fetch(`https://api.heygen.com/v1/audio/tts/${taskId}`, {
+          headers: { 'X-Api-Key': apiKey },
+        })
+        const statusData = await statusRes.json()
+        console.log(`TTS poll ${i}:`, JSON.stringify(statusData))
+
+        const url = statusData?.data?.url || statusData?.data?.audio_url
+        if (url) return Response.json({ url })
+
+        const status = statusData?.data?.status
+        if (status === 'failed' || status === 'error') {
+          return Response.json({ error: 'Génération TTS échouée' }, { status: 500 })
+        }
       }
-
-      return Response.json({ error: friendlyError || `Erreur HeyGen ${res.status}` }, { status: 400 })
+      return Response.json({ error: 'Timeout — génération trop longue' }, { status: 504 })
     }
 
-    const audioUrl    = data.data?.audio_url    || data.audio_url    || null
-    const audioBase64 = data.data?.audio_base64 || data.audio_base64 || null
-
-    if (!audioUrl && !audioBase64) {
-      console.log('[TTS] Réponse sans audio:', raw)
-      return Response.json({ error: 'Aucun audio retourné. Réponse: ' + raw.slice(0, 200) }, { status: 400 })
-    }
-
-    if (audioBase64 && !audioUrl) {
-      return Response.json({ audioUrl: `data:audio/mpeg;base64,${audioBase64}` })
-    }
-
-    return Response.json({ audioUrl })
+    // Cas inattendu
+    console.error('TTS réponse inattendue:', createData)
+    return Response.json({
+      error: createData?.message || createData?.error || 'Réponse inattendue de HeyGen',
+    }, { status: 500 })
 
   } catch (err) {
-    console.error('[TTS] Erreur réseau:', err)
+    console.error('TTS error:', err)
     return Response.json({ error: err.message }, { status: 500 })
   }
 }
