@@ -36,20 +36,15 @@ export default function Sidebar({ user, activeTab, onTabChange, onLogout }) {
         .maybeSingle()
 
       if (error || !data) {
-        // Ligne absente → créer automatiquement
-        const { data: inserted } = await supabase
-          .from('user_credits')
-          .upsert({ user_id: user.id, credits_balance: 1000, plan: 'free' }, { onConflict: 'user_id' })
-          .select()
-          .single()
-        if (inserted) {
-          setCredits(inserted.credits_balance)
-          setPlan(inserted.plan || 'free')
-          setResetAt(inserted.reset_at)
-        } else {
-          setCredits(1000)
-          setPlan('free')
-        }
+        // Ligne absente — le trigger SQL l'a peut-être pas encore créée
+        // On appelle la route API (service_role) pour l'initialiser
+        await fetch('/api/credits/init', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId: user.id }),
+        }).catch(() => {})
+        setCredits(1000)
+        setPlan('free')
       } else {
         setCredits(data.credits_balance)
         setPlan(data.plan || 'free')
