@@ -1,72 +1,61 @@
-// app/api/heygen/tts/route.js
-// Endpoint officiel HeyGen : POST /v1/audio/text_to_speech
+// app/api/heygen/avatars-voices/route.js
+
+let cache = null
+let cacheAt = 0
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
 
 export async function POST(req) {
   try {
+    const now = Date.now()
+
+    // Retourner le cache si encore valide
+    if (cache && (now - cacheAt) < CACHE_TTL) {
+      return Response.json({ ...cache, cached: true })
+    }
+
     const apiKey = process.env.HEYGEN_API_KEY
     if (!apiKey) {
       return Response.json({ error: 'HEYGEN_API_KEY manquante' }, { status: 500 })
     }
-
-    const { texte, voiceId, vitesse = 1.0, pitch = 0 } = await req.json()
-
-    if (!texte?.trim()) return Response.json({ error: 'Texte manquant' }, { status: 400 })
-    if (!voiceId)       return Response.json({ error: 'voiceId manquant' }, { status: 400 })
 
     const headers = {
       'X-Api-Key': apiKey,
       'Content-Type': 'application/json',
     }
 
-    const body = {
-      text:     texte.trim(),
-      voice_id: voiceId,
-      speed:    vitesse,
-      pitch:    pitch,
-    }
+    // Appels en parallèle
+    const [avatarsRes, voicesRes] = await Promise.all([
+      fetch('https://api.heygen.com/v2/avatars', { headers }),
+      fetch('https://api.heygen.com/v2/voices',  { headers }),
+    ])
 
-    console.log('TTS → POST /v1/audio/text_to_speech', JSON.stringify(body))
+    const [avatarsData, voicesData] = await Promise.all([
+      avatarsRes.json(),
+      voicesRes.json(),
+    ])
 
-    const res = await fetch('https://api.heygen.com/v1/audio/text_to_speech', {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(body),
-    })
+    const avatars = avatarsData?.data?.avatars ?? []
+    const voices  = voicesData?.data?.voices   ?? []
 
-    const data = await res.json()
-    console.log('TTS response status:', res.status, JSON.stringify(data))
+    const sorted = [
+      ...avatars.filter(a => a.type === 'personal'),
+      ...avatars.filter(a => a.type !== 'personal'),
+    ]
 
-    // Cas 1 : URL audio directe dans la réponse
-    const directUrl = data?.data?.url || data?.data?.audio_url || data?.url || data?.audio_url
-    if (directUrl) return Response.json({ url: directUrl })
+    const result = { avatars: sorted, voices }
+    cache   = result
+    cacheAt = now
 
-    // Cas 2 : task_id → polling
-    const taskId = data?.data?.task_id || data?.task_id
-    if (taskId) {
-      console.log('TTS polling task_id:', taskId)
-      for (let i = 0; i < 20; i++) {
-        await new Promise(r => setTimeout(r, 2000))
-        const pollRes  = await fetch(`https://api.heygen.com/v1/audio/text_to_speech/${taskId}`, { headers })
-        const pollData = await pollRes.json()
-        console.log(`TTS poll ${i}:`, JSON.stringify(pollData))
-        const audioUrl = pollData?.data?.url || pollData?.data?.audio_url
-        if (audioUrl) return Response.json({ url: audioUrl })
-        const status = pollData?.data?.status
-        if (status === 'failed' || status === 'error') {
-          return Response.json({ error: 'Génération TTS échouée' }, { status: 500 })
-        }
-      }
-      return Response.json({ error: 'Timeout TTS' }, { status: 504 })
-    }
-
-    // Erreur HeyGen explicite
-    console.error('TTS réponse inattendue:', data)
-    return Response.json({
-      error: data?.message || data?.error || `Erreur HeyGen status ${res.status}`,
-    }, { status: res.status || 500 })
+    return Response.json(result)
 
   } catch (err) {
-    console.error('TTS exception:', err)
+    console.error('avatars-voices error:', err)
+    if (cache) return Response.json({ ...cache, cached: true, stale: true })
     return Response.json({ error: err.message }, { status: 500 })
   }
+}
+
+// Accepter aussi GET pour éviter les erreurs de méthode
+export async function GET() {
+  return POST(new Request('https://dummy'))
 }
