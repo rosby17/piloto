@@ -5,25 +5,14 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../../lib/supabase'
 import Icon from './ui/icons'
 
-// ── Quotas par plan ────────────────────────────────────────
-const PLAN_QUOTAS = {
-  free:    1000,
-  starter: 5000,
-  pro:     20000,
-  agency:  50000,
-}
-
-const PLAN_LABELS = {
-  free:    'Gratuit',
-  starter: 'Starter',
-  pro:     'Pro',
-  agency:  'Agency',
-}
+const PLAN_QUOTAS = { free: 1000, starter: 5000, pro: 20000, agency: 50000 }
+const PLAN_LABELS = { free: 'Gratuit', starter: 'Starter', pro: 'Pro', agency: 'Agency' }
 
 export default function Sidebar({ user, activeTab, onTabChange, onLogout }) {
-  const [credits, setCredits]   = useState(null)
-  const [plan, setPlan]         = useState('free')
-  const [resetAt, setResetAt]   = useState(null)
+  const [credits, setCredits] = useState(null)
+  const [plan, setPlan]       = useState('free')
+  const [resetAt, setResetAt] = useState(null)
+  const [loadingCredits, setLoadingCredits] = useState(true)
 
   const nav = [
     { id: 'videos',     label: 'Vidéos',     icon: Icon.grid },
@@ -34,37 +23,55 @@ export default function Sidebar({ user, activeTab, onTabChange, onLogout }) {
   useEffect(() => {
     if (!user?.id) return
     fetchCredits()
-    // Refresh toutes les 30s
     const t = setInterval(fetchCredits, 30000)
     return () => clearInterval(t)
   }, [user?.id])
 
   const fetchCredits = async () => {
-    const { data } = await supabase
-      .from('user_credits')
-      .select('credits_balance, plan, reset_at')
-      .eq('user_id', user.id)
-      .single()
-    if (data) {
-      setCredits(data.credits_balance)
-      setPlan(data.plan || 'free')
-      setResetAt(data.reset_at)
+    try {
+      const { data, error } = await supabase
+        .from('user_credits')
+        .select('credits_balance, plan, reset_at')
+        .eq('user_id', user.id)
+        .single()
+
+      if (error || !data) {
+        // Ligne absente → créer automatiquement
+        const { data: inserted } = await supabase
+          .from('user_credits')
+          .upsert({ user_id: user.id, credits_balance: 1000, plan: 'free' }, { onConflict: 'user_id' })
+          .select()
+          .single()
+        if (inserted) {
+          setCredits(inserted.credits_balance)
+          setPlan(inserted.plan || 'free')
+          setResetAt(inserted.reset_at)
+        } else {
+          setCredits(1000)
+          setPlan('free')
+        }
+      } else {
+        setCredits(data.credits_balance)
+        setPlan(data.plan || 'free')
+        setResetAt(data.reset_at)
+      }
+    } catch (err) {
+      console.error('fetchCredits error:', err)
+      setCredits(0)
+    } finally {
+      setLoadingCredits(false)
     }
   }
 
   const quota      = PLAN_QUOTAS[plan] ?? 1000
-  const used       = credits !== null ? quota - credits : null
-  const pct        = credits !== null ? Math.max(0, Math.min(100, (credits / quota) * 100)) : null
-  const isLow      = pct !== null && pct < 20
-  const isCritical = pct !== null && pct < 10
+  const pct        = credits !== null ? Math.max(0, Math.min(100, (credits / quota) * 100)) : 0
+  const isLow      = pct < 20
+  const isCritical = pct < 10
+  const barColor   = isCritical ? '#ef4444' : isLow ? '#f59e0b' : '#c0392b'
 
-  // Reset date lisible
   const resetLabel = resetAt
     ? new Date(resetAt).toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })
     : null
-
-  // Couleur barre
-  const barColor = isCritical ? '#ef4444' : isLow ? '#f59e0b' : '#c0392b'
 
   return (
     <aside className="w-[220px] border-r border-[#1c1c1c] flex flex-col fixed h-full bg-[#0a0a0a]">
@@ -96,14 +103,12 @@ export default function Sidebar({ user, activeTab, onTabChange, onLogout }) {
               {item.icon}
             </span>
             {item.label}
-            {activeTab === item.id && (
-              <div className="ml-auto w-1 h-1 rounded-full bg-[#c0392b]" />
-            )}
+            {activeTab === item.id && <div className="ml-auto w-1 h-1 rounded-full bg-[#c0392b]" />}
           </button>
         ))}
       </nav>
 
-      {/* ── Bloc Crédits ── */}
+      {/* ── Bloc Crédits — toujours affiché ── */}
       <div className="px-3 pb-3">
         <div className={`rounded-xl border px-3.5 py-3 space-y-2.5 ${
           isCritical ? 'border-red-500/20 bg-red-500/5' :
@@ -111,36 +116,44 @@ export default function Sidebar({ user, activeTab, onTabChange, onLogout }) {
                        'border-[#1e1e1e] bg-[#0d0d0d]'
         }`}>
 
-          {/* Ligne plan + solde */}
+          {/* Plan + solde */}
           <div className="flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold tracking-wide ${
-                plan === 'free'    ? 'bg-[#1e1e1e] text-[#555]' :
-                plan === 'starter' ? 'bg-sky-500/15 text-sky-400' :
-                plan === 'pro'     ? 'bg-violet-500/15 text-violet-400' :
-                                     'bg-amber-500/15 text-amber-400'
-              }`} style={{ fontFamily: "'DM Mono', monospace" }}>
-                {PLAN_LABELS[plan]}
-              </span>
-            </div>
-            <span className={`text-[12px] font-bold tabular-nums ${
-              isCritical ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-white'
+            <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold tracking-wide ${
+              plan === 'free'    ? 'bg-[#1e1e1e] text-[#555]' :
+              plan === 'starter' ? 'bg-sky-500/15 text-sky-400' :
+              plan === 'pro'     ? 'bg-violet-500/15 text-violet-400' :
+                                   'bg-amber-500/15 text-amber-400'
             }`} style={{ fontFamily: "'DM Mono', monospace" }}>
-              {credits !== null ? credits.toLocaleString('fr-FR') : '···'}
+              {PLAN_LABELS[plan]}
             </span>
+
+            {loadingCredits ? (
+              <span className="text-[11px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>···</span>
+            ) : (
+              <span className={`text-[13px] font-bold tabular-nums ${
+                isCritical ? 'text-red-400' : isLow ? 'text-amber-400' : 'text-white'
+              }`} style={{ fontFamily: "'DM Mono', monospace" }}>
+                {credits !== null ? credits.toLocaleString('fr-FR') : '0'}
+              </span>
+            )}
           </div>
+
+          {/* Libellé crédits */}
+          <p className="text-[10px] text-[#444]" style={{ fontFamily: "'DM Mono', monospace" }}>
+            crédits disponibles
+          </p>
 
           {/* Barre de progression */}
           <div className="space-y-1">
-            <div className="h-1 bg-[#1a1a1a] rounded-full overflow-hidden">
+            <div className="h-1.5 bg-[#1a1a1a] rounded-full overflow-hidden">
               <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{ width: `${pct ?? 0}%`, background: barColor }}
+                className="h-full rounded-full transition-all duration-700"
+                style={{ width: `${pct}%`, background: barColor }}
               />
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
-                {credits !== null ? `${credits.toLocaleString('fr-FR')} / ${quota.toLocaleString('fr-FR')}` : ''}
+              <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                {credits !== null ? `${credits.toLocaleString('fr-FR')} / ${quota.toLocaleString('fr-FR')}` : `0 / ${quota.toLocaleString('fr-FR')}`}
               </span>
               {resetLabel && (
                 <span className="text-[10px] text-[#2a2a2a]" style={{ fontFamily: "'DM Mono', monospace" }}>
@@ -150,19 +163,15 @@ export default function Sidebar({ user, activeTab, onTabChange, onLogout }) {
             </div>
           </div>
 
-          {/* Alerte si bas */}
-          {isCritical && (
-            <p className="text-[10px] text-red-400 leading-snug">
-              ⚠ Crédits presque épuisés
-            </p>
+          {/* Alertes */}
+          {isCritical && credits !== null && (
+            <p className="text-[10px] text-red-400">⚠ Crédits presque épuisés</p>
           )}
-          {isLow && !isCritical && (
-            <p className="text-[10px] text-amber-400 leading-snug">
-              Crédits bientôt épuisés
-            </p>
+          {isLow && !isCritical && credits !== null && (
+            <p className="text-[10px] text-amber-400">Crédits bientôt épuisés</p>
           )}
 
-          {/* Bouton upgrade si free */}
+          {/* Upgrade si free */}
           {plan === 'free' && (
             <button
               onClick={() => onTabChange('parametres')}
