@@ -1,68 +1,61 @@
 // app/api/heygen/avatars-voices/route.js
-// Utilise la clé HeyGen master (plus de clé utilisateur)
 
-export async function POST(request) {
+// ── Cache module-level (persiste entre les appels tant que la fonction est chaude) ──
+let cache = null
+let cacheAt = 0
+const CACHE_TTL = 10 * 60 * 1000 // 10 minutes
+
+export async function POST(req) {
   try {
-    // ✅ Clé HeyGen MASTER — jamais exposée au client
-    const heygenKey = process.env.HEYGEN_API_KEY
+    const now = Date.now()
 
-    if (!heygenKey) {
-      return Response.json({ error: 'Clé HeyGen non configurée' }, { status: 500 })
+    // ── Retourner le cache si encore valide ──
+    if (cache && (now - cacheAt) < CACHE_TTL) {
+      return Response.json({ ...cache, cached: true })
     }
 
-    // 3 appels en parallèle : avatars publics + avatars perso + voix
-    const [avatarsRes, personalRes, voicesRes] = await Promise.all([
-      fetch('https://api.heygen.com/v2/avatars', {
-        headers: { 'X-Api-Key': heygenKey },
-      }),
-      fetch('https://api.heygen.com/v2/photo_avatar/avatar_group/list', {
-        headers: { 'X-Api-Key': heygenKey },
-      }),
-      fetch('https://api.heygen.com/v2/voices', {
-        headers: { 'X-Api-Key': heygenKey },
-      }),
+    const apiKey = process.env.HEYGEN_API_KEY
+    if (!apiKey) {
+      return Response.json({ error: 'HEYGEN_API_KEY manquante' }, { status: 500 })
+    }
+
+    const headers = {
+      'X-Api-Key': apiKey,
+      'Content-Type': 'application/json',
+    }
+
+    // ── Fix 2 : appels en parallèle ──
+    const [avatarsRes, voicesRes] = await Promise.all([
+      fetch('https://api.heygen.com/v2/avatars', { headers }),
+      fetch('https://api.heygen.com/v2/voices',  { headers }),
     ])
 
-    if (!avatarsRes.ok) {
-      return Response.json(
-        { error: `Erreur HeyGen (${avatarsRes.status})` },
-        { status: 500 }
-      )
-    }
+    const [avatarsData, voicesData] = await Promise.all([
+      avatarsRes.json(),
+      voicesRes.json(),
+    ])
 
-    const avatarsData  = await avatarsRes.json()
-    const personalData = personalRes.ok ? await personalRes.json() : null
-    const voicesData   = voicesRes.ok   ? await voicesRes.json()   : null
+    const avatars = avatarsData?.data?.avatars ?? []
+    const voices  = voicesData?.data?.voices   ?? []
 
-    const publicAvatars = (avatarsData.data?.avatars || []).map(a => ({
-      avatar_id:         a.avatar_id,
-      avatar_name:       a.avatar_name,
-      preview_image_url: a.preview_image_url || null,
-      gender:            a.gender || null,
-      type:              'public',
-    }))
+    // Trier : avatars perso en premier
+    const sorted = [
+      ...avatars.filter(a => a.type === 'personal'),
+      ...avatars.filter(a => a.type !== 'personal'),
+    ]
 
-    const personalAvatars = (personalData?.data?.avatar_group_list || []).map(g => ({
-      avatar_id:         g.id,
-      avatar_name:       g.name || 'Mon avatar',
-      preview_image_url: g.preview_image_url || g.cover_image_url || null,
-      gender:            null,
-      type:              'personal',
-    }))
+    const result = { avatars: sorted, voices }
 
-    const avatars = [...personalAvatars, ...publicAvatars]
+    // ── Mettre en cache ──
+    cache   = result
+    cacheAt = now
 
-    const voices = (voicesData?.data?.voices || []).map(v => ({
-      voice_id: v.voice_id,
-      name:     v.name,
-      language: v.language,
-      locale:   v.locale,
-      gender:   v.gender,
-    }))
-
-    return Response.json({ avatars, voices })
+    return Response.json(result)
 
   } catch (err) {
+    console.error('avatars-voices error:', err)
+    // Retourner le cache périmé plutôt qu'une erreur
+    if (cache) return Response.json({ ...cache, cached: true, stale: true })
     return Response.json({ error: err.message }, { status: 500 })
   }
 }

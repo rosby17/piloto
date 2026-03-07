@@ -1,11 +1,11 @@
 // app/dashboard/components/VoixOff.jsx
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useRef } from 'react'
 
-export default function VoixOff({ user }) {
+// voices + loadingAssets viennent de page.jsx (chargés une seule fois)
+export default function VoixOff({ user, voices = [], loadingAssets = false }) {
   const [texte, setTexte]             = useState('')
-  const [voices, setVoices]           = useState([])
   const [voiceId, setVoiceId]         = useState('')
   const [voiceFilter, setVoiceFilter] = useState('fr')
   const [activeTab, setActiveTab]     = useState('reglages')
@@ -19,38 +19,24 @@ export default function VoixOff({ user }) {
 
   const MAX_CHARS = 1500
 
-  useEffect(() => {
-    const loadVoices = async () => {
-      try {
-        const res = await fetch('/api/heygen/avatars-voices', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({}),
-        })
-        const data = await res.json()
-        if (data.voices) {
-          setVoices(data.voices)
-          if (data.voices.length > 0) setVoiceId(data.voices[0].voice_id)
-        }
-      } catch (err) {
-        console.error('Erreur chargement voix:', err)
-      }
-    }
-    loadVoices()
-  }, [])
+  // Sélectionner la première voix FR dès que les voix arrivent
+  const firstFrVoice = voices.find(v =>
+    v.language?.toLowerCase().includes('fr') || v.locale?.toLowerCase().includes('fr')
+  )
+  const effectiveVoiceId = voiceId || firstFrVoice?.voice_id || voices[0]?.voice_id || ''
 
   const filteredVoices = voices.filter(v => {
     if (voiceFilter === 'all') return true
     return v.language?.toLowerCase().includes(voiceFilter) || v.locale?.toLowerCase().includes(voiceFilter)
   })
 
-  const selectedVoice  = voices.find(v => v.voice_id === voiceId)
-  const wordCount      = texte.trim().split(/\s+/).filter(Boolean).length
-  const charCount      = texte.length
-  const estimatedMin   = Math.ceil(wordCount / 140)
+  const selectedVoice = voices.find(v => v.voice_id === effectiveVoiceId)
+  const wordCount     = texte.trim().split(/\s+/).filter(Boolean).length
+  const charCount     = texte.length
+  const estimatedMin  = Math.ceil(wordCount / 140)
 
   const generer = async () => {
-    if (!texte.trim() || !voiceId) return
+    if (!texte.trim() || !effectiveVoiceId) return
     setGenerating(true)
     setError(null)
     setAudioUrl(null)
@@ -58,7 +44,7 @@ export default function VoixOff({ user }) {
       const res = await fetch('/api/heygen/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ texte, voiceId, vitesse, pitch }),
+        body: JSON.stringify({ texte, voiceId: effectiveVoiceId, vitesse, pitch }),
       })
       const data = await res.json()
       if (data.url) {
@@ -66,7 +52,7 @@ export default function VoixOff({ user }) {
         setHistorique(prev => [{
           id: Date.now(),
           texte: texte.slice(0, 60) + (texte.length > 60 ? '...' : ''),
-          voix: selectedVoice?.name || voiceId,
+          voix: selectedVoice?.name || effectiveVoiceId,
           url: data.url,
           date: new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' }),
         }, ...prev].slice(0, 20))
@@ -104,7 +90,6 @@ export default function VoixOff({ user }) {
         {/* Zone texte principale */}
         <div className="flex-1 flex flex-col overflow-hidden px-10 py-6">
 
-          {/* Textarea */}
           <div className="flex-1 relative">
             <textarea
               value={texte}
@@ -115,7 +100,6 @@ export default function VoixOff({ user }) {
             />
           </div>
 
-          {/* Stats */}
           <div className="mt-2 flex items-center gap-4 text-[11px] text-[#333] flex-shrink-0"
                style={{ fontFamily: "'DM Mono', monospace" }}>
             {texte.trim() && <><span>{wordCount} mots</span><span>·</span><span>+{estimatedMin} min</span></>}
@@ -124,7 +108,6 @@ export default function VoixOff({ user }) {
             </span>
           </div>
 
-          {/* Erreur */}
           {error && (
             <div className="mt-3 flex items-center gap-2.5 px-4 py-3 bg-red-500/8 border border-red-500/20 rounded-xl flex-shrink-0">
               <svg width="14" height="14" viewBox="0 0 14 14" fill="none" className="text-red-400 flex-shrink-0">
@@ -135,7 +118,6 @@ export default function VoixOff({ user }) {
             </div>
           )}
 
-          {/* Audio résultat */}
           {audioUrl && (
             <div className="mt-3 border border-emerald-500/20 bg-emerald-500/5 rounded-xl overflow-hidden flex-shrink-0">
               <div className="flex items-center justify-between px-4 py-2.5 border-b border-emerald-500/10">
@@ -157,17 +139,13 @@ export default function VoixOff({ user }) {
             </div>
           )}
 
-          {/* Bouton Générer */}
           <button
             onClick={generer}
-            disabled={!texte.trim() || !voiceId || generating || charCount > MAX_CHARS}
+            disabled={!texte.trim() || !effectiveVoiceId || generating || charCount > MAX_CHARS}
             className="mt-4 flex items-center justify-center gap-2.5 w-full py-3.5 bg-[#c0392b] hover:bg-[#a93226] disabled:opacity-30 disabled:cursor-not-allowed text-white text-[13px] font-medium rounded-xl transition-all flex-shrink-0"
           >
             {generating ? (
-              <>
-                <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Génération en cours...
-              </>
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Génération en cours...</>
             ) : (
               <>
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -183,30 +161,27 @@ export default function VoixOff({ user }) {
         {/* ── Sidebar droite ── */}
         <div className="w-[300px] border-l border-[#1c1c1c] flex flex-col flex-shrink-0 overflow-hidden">
 
-          {/* Tabs */}
           <div className="flex border-b border-[#1c1c1c] flex-shrink-0">
             {['reglages', 'historique'].map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
+              <button key={tab} onClick={() => setActiveTab(tab)}
                 className={`flex-1 py-3.5 text-[12px] font-medium transition-all ${
-                  activeTab === tab
-                    ? 'text-white border-b-2 border-[#c0392b]'
-                    : 'text-[#444] hover:text-[#888]'
-                }`}
-                style={{ fontFamily: "'DM Mono', monospace" }}
-              >
+                  activeTab === tab ? 'text-white border-b-2 border-[#c0392b]' : 'text-[#444] hover:text-[#888]'
+                }`} style={{ fontFamily: "'DM Mono', monospace" }}>
                 {tab === 'reglages' ? 'Réglages' : 'Historique'}
               </button>
             ))}
           </div>
 
-          {/* ── Réglages ── */}
           {activeTab === 'reglages' && (
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
 
               {/* Voix active */}
-              {selectedVoice && (
+              {loadingAssets ? (
+                <div className="flex items-center gap-2.5 px-3.5 py-3 bg-[#0d0d0d] border border-[#1e1e1e] rounded-xl">
+                  <span className="w-4 h-4 border-2 border-[#c0392b] border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                  <span className="text-[12px] text-[#444]">Chargement des voix...</span>
+                </div>
+              ) : selectedVoice ? (
                 <div className="flex items-center gap-3 px-3.5 py-3 bg-[#c0392b]/10 border border-[#c0392b]/20 rounded-xl">
                   <div className="w-8 h-8 rounded-lg bg-[#c0392b]/20 flex items-center justify-center text-[#c0392b] flex-shrink-0">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
@@ -219,85 +194,73 @@ export default function VoixOff({ user }) {
                     <p className="text-[10px] text-[#555]">HeyGen TTS</p>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Choisir voix */}
-              <div>
-                <div className="flex items-center justify-between mb-2.5">
-                  <span className="text-[10px] text-[#444] tracking-widest uppercase"
-                        style={{ fontFamily: "'DM Mono', monospace" }}>Choisir</span>
-                  <span className="text-[10px] text-[#333]"
-                        style={{ fontFamily: "'DM Mono', monospace" }}>
-                    {filteredVoices.length} / {voices.length}
-                  </span>
-                </div>
+              {!loadingAssets && (
+                <div>
+                  <div className="flex items-center justify-between mb-2.5">
+                    <span className="text-[10px] text-[#444] tracking-widest uppercase"
+                          style={{ fontFamily: "'DM Mono', monospace" }}>Choisir</span>
+                    <span className="text-[10px] text-[#333]" style={{ fontFamily: "'DM Mono', monospace" }}>
+                      {filteredVoices.length} / {voices.length}
+                    </span>
+                  </div>
 
-                {/* Filtres langue */}
-                <div className="flex gap-1.5 mb-3 flex-wrap">
-                  {langFilters.map(f => (
-                    <button
-                      key={f.key}
-                      onClick={() => setVoiceFilter(f.key)}
-                      className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${
-                        voiceFilter === f.key
-                          ? 'border-[#c0392b] bg-[#c0392b]/10 text-[#c0392b]'
-                          : 'border-[#1e1e1e] text-[#555] hover:text-[#888]'
-                      }`}
-                    >
-                      {f.label}
-                    </button>
-                  ))}
-                </div>
+                  <div className="flex gap-1.5 mb-3 flex-wrap">
+                    {langFilters.map(f => (
+                      <button key={f.key} onClick={() => setVoiceFilter(f.key)}
+                        className={`text-[11px] px-2.5 py-1 rounded-lg border transition ${
+                          voiceFilter === f.key
+                            ? 'border-[#c0392b] bg-[#c0392b]/10 text-[#c0392b]'
+                            : 'border-[#1e1e1e] text-[#555] hover:text-[#888]'
+                        }`}>{f.label}</button>
+                    ))}
+                  </div>
 
-                {/* Liste voix */}
-                <div className="overflow-y-auto rounded-xl border border-[#1a1a1a]"
-                     style={{ maxHeight: '200px' }}>
-                  {filteredVoices.length === 0 ? (
-                    <div className="flex items-center justify-center py-8 text-[12px] text-[#333]">
-                      Aucune voix disponible
-                    </div>
-                  ) : (
-                    filteredVoices.slice(0, 80).map(voice => (
-                      <button
-                        key={voice.voice_id}
-                        onClick={() => setVoiceId(voice.voice_id)}
-                        className={`w-full flex items-center gap-2.5 px-3 py-2.5 border-b border-[#0f0f0f] text-left transition last:border-0 ${
-                          voiceId === voice.voice_id ? 'bg-[#c0392b]/8' : 'hover:bg-[#0f0f0f]'
-                        }`}
-                      >
-                        <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          voiceId === voice.voice_id ? 'bg-[#c0392b]' : 'bg-[#1e1e1e]'
-                        }`}>
-                          {voiceId === voice.voice_id && (
-                            <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
-                              <path d="M1.5 4l2 2 3-3.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
-                            </svg>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className={`text-[11px] font-medium truncate ${voiceId === voice.voice_id ? 'text-white' : 'text-[#888]'}`}>
-                            {voice.name}
-                          </p>
-                          <p className="text-[10px] text-[#333]">{voice.language || voice.locale}</p>
-                        </div>
-                      </button>
-                    ))
-                  )}
+                  <div className="overflow-y-auto rounded-xl border border-[#1a1a1a]" style={{ maxHeight: '200px' }}>
+                    {filteredVoices.length === 0 ? (
+                      <div className="flex items-center justify-center py-8 text-[12px] text-[#333]">
+                        Aucune voix disponible
+                      </div>
+                    ) : (
+                      filteredVoices.slice(0, 80).map(voice => (
+                        <button key={voice.voice_id}
+                          onClick={() => setVoiceId(voice.voice_id)}
+                          className={`w-full flex items-center gap-2.5 px-3 py-2.5 border-b border-[#0f0f0f] text-left transition last:border-0 ${
+                            effectiveVoiceId === voice.voice_id ? 'bg-[#c0392b]/8' : 'hover:bg-[#0f0f0f]'
+                          }`}>
+                          <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${
+                            effectiveVoiceId === voice.voice_id ? 'bg-[#c0392b]' : 'bg-[#1e1e1e]'
+                          }`}>
+                            {effectiveVoiceId === voice.voice_id && (
+                              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                                <path d="M1.5 4l2 2 3-3.5" stroke="white" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+                              </svg>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className={`text-[11px] font-medium truncate ${effectiveVoiceId === voice.voice_id ? 'text-white' : 'text-[#888]'}`}>
+                              {voice.name}
+                            </p>
+                            <p className="text-[10px] text-[#333]">{voice.language || voice.locale}</p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Vitesse */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-[#444] tracking-widest uppercase"
-                        style={{ fontFamily: "'DM Mono', monospace" }}>Vitesse</span>
-                  <span className="text-[12px] font-bold text-[#c0392b]"
-                        style={{ fontFamily: "'DM Mono', monospace" }}>{vitesse.toFixed(1)}x</span>
+                  <span className="text-[10px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Vitesse</span>
+                  <span className="text-[12px] font-bold text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{vitesse.toFixed(1)}x</span>
                 </div>
-                <input type="range" min="0.5" max="2.0" step="0.1"
-                  value={vitesse} onChange={e => setVitesse(parseFloat(e.target.value))}
-                  className="w-full cursor-pointer" style={{ accentColor: '#c0392b' }}
-                />
+                <input type="range" min="0.5" max="2.0" step="0.1" value={vitesse}
+                  onChange={e => setVitesse(parseFloat(e.target.value))}
+                  className="w-full cursor-pointer" style={{ accentColor: '#c0392b' }} />
                 <div className="flex justify-between mt-1">
                   <span className="text-[10px] text-[#2a2a2a]">Lent</span>
                   <span className="text-[10px] text-[#2a2a2a]">Rapide</span>
@@ -307,32 +270,25 @@ export default function VoixOff({ user }) {
               {/* Pitch */}
               <div>
                 <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] text-[#444] tracking-widest uppercase"
-                        style={{ fontFamily: "'DM Mono', monospace" }}>Pitch</span>
-                  <span className="text-[12px] font-bold text-[#c0392b]"
-                        style={{ fontFamily: "'DM Mono', monospace" }}>{pitch > 0 ? '+' : ''}{pitch}</span>
+                  <span className="text-[10px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Pitch</span>
+                  <span className="text-[12px] font-bold text-[#c0392b]" style={{ fontFamily: "'DM Mono', monospace" }}>{pitch > 0 ? '+' : ''}{pitch}</span>
                 </div>
-                <input type="range" min="-10" max="10" step="1"
-                  value={pitch} onChange={e => setPitch(parseInt(e.target.value))}
-                  className="w-full cursor-pointer" style={{ accentColor: '#c0392b' }}
-                />
+                <input type="range" min="-10" max="10" step="1" value={pitch}
+                  onChange={e => setPitch(parseInt(e.target.value))}
+                  className="w-full cursor-pointer" style={{ accentColor: '#c0392b' }} />
                 <div className="flex justify-between mt-1">
                   <span className="text-[10px] text-[#2a2a2a]">Grave</span>
                   <span className="text-[10px] text-[#2a2a2a]">Aigu</span>
                 </div>
               </div>
 
-              {/* Moteur */}
               <div className="flex items-center justify-between py-2.5 border-t border-[#1a1a1a]">
-                <span className="text-[10px] text-[#444] tracking-widest uppercase"
-                      style={{ fontFamily: "'DM Mono', monospace" }}>Moteur</span>
+                <span className="text-[10px] text-[#444] tracking-widest uppercase" style={{ fontFamily: "'DM Mono', monospace" }}>Moteur</span>
                 <span className="text-[11px] text-[#555]">HeyGen TTS</span>
               </div>
-
             </div>
           )}
 
-          {/* ── Historique ── */}
           {activeTab === 'historique' && (
             <div className="flex-1 overflow-y-auto px-5 py-4">
               {historique.length === 0 ? (
@@ -352,8 +308,7 @@ export default function VoixOff({ user }) {
                       <div className="px-3.5 py-3 bg-[#0a0a0a]">
                         <div className="flex items-start justify-between gap-2 mb-1">
                           <p className="text-[11px] text-white leading-snug flex-1">{item.texte}</p>
-                          <span className="text-[10px] text-[#333] flex-shrink-0"
-                                style={{ fontFamily: "'DM Mono', monospace" }}>{item.date}</span>
+                          <span className="text-[10px] text-[#333] flex-shrink-0" style={{ fontFamily: "'DM Mono', monospace" }}>{item.date}</span>
                         </div>
                         <p className="text-[10px] text-[#444]">{item.voix}</p>
                       </div>
