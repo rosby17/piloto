@@ -1,13 +1,13 @@
 // app/api/heygen/avatars-voices/route.js
-// Récupère avatars publics + avatars personnels + voix
+// Utilise la clé HeyGen master (plus de clé utilisateur)
 
 export async function POST(request) {
   try {
-    const body = await request.json()
-    const heygenKey = (body.heygenKey || body.apiKey || '').trim()
+    // ✅ Clé HeyGen MASTER — jamais exposée au client
+    const heygenKey = process.env.HEYGEN_API_KEY
 
     if (!heygenKey) {
-      return Response.json({ error: 'Clé API manquante' }, { status: 400 })
+      return Response.json({ error: 'Clé HeyGen non configurée' }, { status: 500 })
     }
 
     // 3 appels en parallèle : avatars publics + avatars perso + voix
@@ -25,8 +25,8 @@ export async function POST(request) {
 
     if (!avatarsRes.ok) {
       return Response.json(
-        { error: `Clé API invalide (${avatarsRes.status})` },
-        { status: 401 }
+        { error: `Erreur HeyGen (${avatarsRes.status})` },
+        { status: 500 }
       )
     }
 
@@ -34,7 +34,6 @@ export async function POST(request) {
     const personalData = personalRes.ok ? await personalRes.json() : null
     const voicesData   = voicesRes.ok   ? await voicesRes.json()   : null
 
-    // Avatars publics HeyGen
     const publicAvatars = (avatarsData.data?.avatars || []).map(a => ({
       avatar_id:         a.avatar_id,
       avatar_name:       a.avatar_name,
@@ -43,7 +42,6 @@ export async function POST(request) {
       type:              'public',
     }))
 
-    // Avatars personnels (Photo Avatar / Digital Twin)
     const personalAvatars = (personalData?.data?.avatar_group_list || []).map(g => ({
       avatar_id:         g.id,
       avatar_name:       g.name || 'Mon avatar',
@@ -52,7 +50,6 @@ export async function POST(request) {
       type:              'personal',
     }))
 
-    // Fusion : avatars perso en premier
     const avatars = [...personalAvatars, ...publicAvatars]
 
     const voices = (voicesData?.data?.voices || []).map(v => ({
