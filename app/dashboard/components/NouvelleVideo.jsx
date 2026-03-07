@@ -42,7 +42,7 @@ export default function NouvelleVideo({ user, avatars = [], voices = [], loading
     const init = async () => {
       const { data: { user: u } } = await supabase.auth.getUser()
       if (!u) return
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', u.id).single()
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', u.id).maybeSingle()
       if (profile?.default_avatar_id) {
         setAvatarId(profile.default_avatar_id)
         setSelectedAvatarObj({
