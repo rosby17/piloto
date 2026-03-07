@@ -2,12 +2,12 @@
 // Rôle : envoyer à HeyGen et sauvegarder heygen_video_id — RETOURNE immédiatement
 import { createClient } from '@supabase/supabase-js'
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
-)
 
 export async function POST(request) {
+  const supabase = createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL,
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  )
   const { userId, contenu, avatarId, voiceId, heygenKey, titre, description } = await request.json()
 
   if (!userId)    return Response.json({ error: 'userId manquant' },    { status: 400 })
