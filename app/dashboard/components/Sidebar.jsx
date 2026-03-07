@@ -33,7 +33,7 @@ export default function Sidebar({ user, activeTab, onTabChange, onLogout }) {
         .from('user_credits')
         .select('credits_balance, plan, reset_at')
         .eq('user_id', user.id)
-        .single()
+        .maybeSingle()
 
       if (error || !data) {
         // Ligne absente → créer automatiquement
