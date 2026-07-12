@@ -42,14 +42,19 @@ export default function GeneratePage() {
     setIsGenerating(true);
     
     try {
-      const res = await fetch("/api/videos", {
+      const selectedAvatarObj = avatars.find(a => a.id === selectedAvatar);
+      const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ avatar_id: selectedAvatar, text }),
+        body: JSON.stringify({ 
+          script_text: text, 
+          avatar_image_url: selectedAvatarObj?.photo_url,
+          voice_id: "default_voice"
+        }),
       });
       const data = await res.json();
       
-      if (data.video) {
+      if (data.success || data.video_id) {
         alert("La vidéo a été ajoutée à la file d'attente ! Redirection vers l'historique...");
         window.location.href = "/dashboard/history";
       } else {
