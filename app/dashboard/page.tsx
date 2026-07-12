@@ -1,6 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
+import { toast } from "sonner";
 import { Plus, Image as ImageIcon, Trash2, Loader2, Video } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import Link from "next/link";
@@ -60,11 +61,11 @@ export default function AvatarsPage() {
       if (data.avatar) {
         setAvatars([data.avatar, ...avatars]);
       } else if (data.error) {
-        alert("Erreur : " + data.error);
+        toast.error("Erreur : " + data.error);
       }
     } catch (error) {
       console.error("Erreur d'upload", error);
-      alert("Une erreur est survenue lors de l'upload.");
+      toast.error("Une erreur est survenue lors de l'upload.");
     } finally {
       setIsUploading(false);
       if (fileInputRef.current) {

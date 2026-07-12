@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { toast } from 'sonner'
 import Icon from './ui/icons'
 import { Btn, Field, PageHeader, AvatarCard } from './ui/shared'
 import { inputCls } from './ui/utils'
@@ -155,9 +156,9 @@ export default function NouvelleVideo({ user, avatars = [], voices = [], loading
   const lancerGeneration = async () => {
     console.log('🚀 lancerGeneration', { contenuLen: contenu?.length, avatarId, voiceId })
 
-    if (!contenu?.trim()) { alert('Le script est vide.'); return }
-    if (!avatarId)         { alert('Choisis un avatar.'); return }
-    if (!voiceId)          { alert('Choisis une voix.'); return }
+    if (!contenu?.trim()) { toast.error('Le script est vide.'); return }
+    if (!avatarId)         { toast.error('Choisis un avatar.'); return }
+    if (!voiceId)          { toast.error('Choisis une voix.'); return }
 
     savingDraftRef.current = true
     setLoading(true)
@@ -165,7 +166,7 @@ export default function NouvelleVideo({ user, avatars = [], voices = [], loading
 
     try {
       const { data: { user: u } } = await supabase.auth.getUser()
-      if (!u) { alert('Session expirée, reconnecte-toi.'); setLoading(false); return }
+      if (!u) { toast.error('Session expirée, reconnecte-toi.'); setLoading(false); return }
 
       const res = await fetch('/api/generate', {
         method: 'POST',
@@ -195,11 +196,11 @@ export default function NouvelleVideo({ user, avatars = [], voices = [], loading
       if (res.ok && data.success) {
         onBack()
       } else {
-        alert('Erreur : ' + (data.error || data.message || 'Inconnue'))
+        toast.error('Erreur : ' + (data.error || data.message || 'Inconnue'))
       }
     } catch (err) {
       console.error('lancerGeneration error:', err)
-      alert('Erreur réseau : ' + err.message)
+      toast.error('Erreur réseau : ' + err.message)
     }
 
     setLoading(false)

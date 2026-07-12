@@ -8,6 +8,7 @@ import {
   Wand2, Save, Download, Zap, Mic2, Upload, Plus,
   MonitorSmartphone, Shapes, Video, Music, Loader2
 } from "lucide-react";
+import { toast } from "sonner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
@@ -39,10 +40,10 @@ export default function AvatarStudio() {
       if (data.success) {
         setGeneratedVideoUrl(data.video_url);
       } else {
-        alert("Erreur: " + data.error);
+        toast.error("Erreur: " + data.error);
       }
     } catch (err) {
-      alert("Une erreur est survenue.");
+      toast.error("Une erreur est survenue.");
     } finally {
       setIsGenerating(false);
     }

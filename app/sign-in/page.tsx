@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { Video, Loader2 } from "lucide-react";
+import { toast } from "sonner";
 import { createClient } from "@/utils/supabase/client";
 import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -22,7 +23,7 @@ function SignInContent() {
       },
     });
     if (error) {
-      alert("Erreur de connexion : " + error.message);
+      toast.error("Erreur de connexion : " + error.message);
       setIsLoading(null);
     }
   };

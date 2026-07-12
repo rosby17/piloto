@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { Play, Loader2, Sparkles } from "lucide-react";
 import { useState, useEffect } from "react";
+import { toast } from "sonner";
 
 interface Avatar {
   id: string;
@@ -55,14 +56,14 @@ export default function GeneratePage() {
       const data = await res.json();
       
       if (data.success || data.video_id) {
-        alert("La vidéo a été ajoutée à la file d'attente ! Redirection vers l'historique...");
-        window.location.href = "/dashboard/history";
+        toast.success("La vidéo a été ajoutée à la file d'attente ! Redirection vers l'historique...");
+        setTimeout(() => window.location.href = "/dashboard/history", 2000);
       } else {
-        alert("Erreur: " + data.error);
+        toast.error("Erreur: " + data.error);
       }
     } catch (error) {
       console.error(error);
-      alert("Une erreur est survenue.");
+      toast.error("Une erreur est survenue.");
     } finally {
       setIsGenerating(false);
     }

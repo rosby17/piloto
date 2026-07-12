@@ -4,6 +4,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
+import { toast } from 'sonner'
 import Icon from './ui/icons'
 import { Btn, PageHeader, VideoDurationBadge } from './ui/shared'
 import { timeAgo, STATUTS_EN_COURS, getStatusLabel, getStatusOverlay } from './ui/utils'
@@ -16,6 +17,7 @@ export default function MesVideos({ user, onNouvelleVideo }) {
   const [editTitre, setEditTitre] = useState('')
   const [editDescription, setEditDescription] = useState('')
   const [saving, setSaving] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState(null)
   const [deletingId, setDeletingId] = useState(null)
   const [openMenuId, setOpenMenuId] = useState(null)
   const [menuPos, setMenuPos] = useState({ x: 0, y: 0 })
@@ -94,10 +96,14 @@ export default function MesVideos({ user, onNouvelleVideo }) {
   }
 
   const supprimerVideo = async (id) => {
-    if (!confirm('Supprimer cette vidéo définitivement ?')) return
     setDeletingId(id)
-    await supabase.from('videos').delete().eq('id', id)
-    setDeletingId(null); fetchVideos()
+    const { error } = await supabase.from('videos').delete().eq('id', id)
+    if (error) {
+      toast.error("Erreur lors de la suppression.")
+    } else {
+      toast.success("Vidéo supprimée avec succès.")
+    }
+    setDeletingId(null); setConfirmDeleteId(null); fetchVideos()
   }
 
   const isEnCours = (v) => STATUTS_EN_COURS.includes(v.statut)
@@ -230,6 +236,25 @@ export default function MesVideos({ user, onNouvelleVideo }) {
           </div>
         )}
 
+        {/* Modal suppression */}
+        {confirmDeleteId && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+            <div className="bg-[#0e0e0e] border border-[#222] rounded-2xl p-6 w-full max-w-sm mx-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[18px] text-white">Supprimer la vidéo</h3>
+                <button onClick={() => setConfirmDeleteId(null)} className="text-[#444] hover:text-white transition">{Icon.close}</button>
+              </div>
+              <p className="text-[13px] text-[#888]">Es-tu sûr de vouloir supprimer cette vidéo définitivement ? Cette action est irréversible.</p>
+              <div className="flex gap-2">
+                <Btn variant="ghost" onClick={() => setConfirmDeleteId(null)} className="flex-1 justify-center">Annuler</Btn>
+                <Btn onClick={() => supprimerVideo(confirmDeleteId)} disabled={deletingId === confirmDeleteId} className="flex-1 justify-center bg-red-500 hover:bg-red-600 border-red-500 hover:border-red-600 text-white">
+                  {deletingId === confirmDeleteId ? 'Suppression...' : 'Oui, supprimer'}
+                </Btn>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Menu contextuel */}
         {openMenuId && (() => {
           const v = videos.find(vid => vid.id === openMenuId)
@@ -296,7 +321,7 @@ export default function MesVideos({ user, onNouvelleVideo }) {
                   Modifier titre/desc
                 </button>
                 <div className="border-t border-[#1e1e1e] my-1" />
-                <button onClick={() => { supprimerVideo(v.id); setOpenMenuId(null) }} disabled={deletingId === v.id} className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
+                <button onClick={() => { setConfirmDeleteId(v.id); setOpenMenuId(null) }} disabled={deletingId === v.id} className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-red-400/70 hover:text-red-400 hover:bg-red-500/8 transition w-full text-left disabled:opacity-30">
                   <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 4h10M5 4V3a.5.5 0 01.5-.5h3a.5.5 0 01.5.5v1M5.5 6v4.5M8.5 6v4.5M3.5 4l.5 7a.5.5 0 00.5.5h5a.5.5 0 00.5-.5l.5-7" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/></svg>
                   {deletingId === v.id ? 'Suppression...' : 'Supprimer'}
                 </button>
