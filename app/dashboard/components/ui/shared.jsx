@@ -12,7 +12,7 @@ export function PageHeader({ title, sub, action }) {
   return (
     <div className="border-b border-[#1c1c1c] px-10 py-8 flex items-start justify-between flex-shrink-0">
       <div>
-        <p className="text-[11px] text-[#444] tracking-[.15em] uppercase mb-1.5" style={{ fontFamily: "'DM Mono', monospace" }}>Piloto</p>
+        <p className="text-[11px] text-[#444] tracking-[.15em] uppercase mb-1.5" style={{ fontFamily: "'DM Mono', monospace" }}>Rogen</p>
         <h1 style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[28px] text-white leading-tight">{title}</h1>
         {sub && <p className="text-[13px] text-[#555] mt-1">{sub}</p>}
       </div>

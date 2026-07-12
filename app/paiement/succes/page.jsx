@@ -30,7 +30,7 @@ function SuccesContent() {
 
       <h1 style={{ fontFamily: "'DM Serif Display', serif" }} className="text-[40px] leading-tight text-white mb-4">
         Bienvenue sur<br />
-        <span className="text-[#c0392b] italic">Piloto {planLabel}.</span>
+        <span className="text-[#c0392b] italic">Rogen {planLabel}.</span>
       </h1>
 
       <p className="text-[14px] text-[#444] mb-10 leading-relaxed">

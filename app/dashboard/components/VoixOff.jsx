@@ -78,7 +78,7 @@ export default function VoixOff({ user, voices = [], loadingAssets = false }) {
       {/* ── En-tête ── */}
       <div className="border-b border-[#1c1c1c] px-10 py-8 flex-shrink-0">
         <p className="text-[11px] text-[#444] tracking-[.15em] uppercase mb-1.5"
-           style={{ fontFamily: "'DM Mono', monospace" }}>Piloto</p>
+           style={{ fontFamily: "'DM Mono', monospace" }}>Rogen</p>
         <h1 style={{ fontFamily: "'DM Serif Display', serif" }}
             className="text-[28px] text-white leading-tight">Voix off</h1>
         <p className="text-[13px] text-[#555] mt-1">Génère un audio depuis un texte avec une voix HeyGen</p>

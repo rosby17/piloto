@@ -93,7 +93,7 @@ export default function Admin() {
         <div className="p-6 border-b border-gray-800">
           <div className="flex items-center gap-2 mb-1">
             <span className="text-2xl">✈️</span>
-            <span className="text-xl font-black">Piloto</span>
+            <span className="text-xl font-black">Rogen</span>
           </div>
           <span className="text-xs bg-red-600 text-white px-2 py-0.5 rounded-full">Admin</span>
         </div>
@@ -140,7 +140,7 @@ export default function Admin() {
         {activeTab === 'stats' && (
           <div>
             <h1 className="text-3xl font-black mb-2">Stats globales</h1>
-            <p className="text-gray-400 mb-8">Vue d'ensemble de Piloto</p>
+            <p className="text-gray-400 mb-8">Vue d'ensemble de Rogen</p>
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
               {[

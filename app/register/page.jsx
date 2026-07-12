@@ -69,7 +69,7 @@ export default function Register() {
         <div className="text-center mb-8">
           <a href="/" className="inline-flex items-center gap-2">
             <span className="text-3xl">✈️</span>
-            <span className="text-2xl font-black">Piloto</span>
+            <span className="text-2xl font-black">Rogen</span>
           </a>
           <p className="text-gray-400 mt-2">Crée ton compte gratuitement</p>
         </div>

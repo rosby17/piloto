@@ -25,7 +25,7 @@ export async function POST(req) {
       body: JSON.stringify({
         amount,
         currency,
-        description: `Piloto ${planName} — abonnement mensuel`,
+        description: `Rogen ${planName} — abonnement mensuel`,
         metadata: { plan },
 
         // ── Customer ────────────────────────────────────────────────────────

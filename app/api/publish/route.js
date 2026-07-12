@@ -83,9 +83,9 @@ async function uploadYoutube({ video, chaineData }) {
     part: ['snippet', 'status'],
     requestBody: {
       snippet: {
-        title: video.titre || 'Ma vidéo Piloto',
+        title: video.titre || 'Ma vidéo Rogen',
         description: video.description || '',
-        tags: ['IA', 'Piloto', 'YouTube automation'],
+        tags: ['IA', 'Rogen', 'YouTube automation'],
         categoryId: '22',
         defaultLanguage: 'fr',
       },

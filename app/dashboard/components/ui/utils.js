@@ -48,7 +48,7 @@ export function getStatusLabel(statut) {
     generation_script: 'Script IA',
     script_pret:       'Draft',
     generation_video:  'Envoi...',
-    video_en_cours:    'Piloto',
+    video_en_cours:    'Rogen',
     upload_youtube:    'Prête ✓',
     publiee:           'Publiée',
     programmee:        'Programmée',
@@ -68,7 +68,7 @@ export function getStatusOverlay(statut) {
     case 'generation_video':
       return { label: 'Envoi en cours...', bg: 'bg-amber-500/20 border-amber-500/30', dot: 'bg-amber-400', badge: 'bg-amber-500/80 text-white', glowColor: '#f59e0b', pulse: true }
     case 'video_en_cours':
-      return { label: 'Piloto génère...', bg: 'bg-amber-500/20 border-amber-500/30', dot: 'bg-amber-400', badge: 'bg-amber-500/80 text-white', glowColor: '#f59e0b', pulse: true }
+      return { label: 'Rogen génère...', bg: 'bg-amber-500/20 border-amber-500/30', dot: 'bg-amber-400', badge: 'bg-amber-500/80 text-white', glowColor: '#f59e0b', pulse: true }
     case 'upload_youtube':
       return { label: 'Vidéo prête ✓', bg: 'bg-emerald-500/20 border-emerald-500/30', dot: 'bg-emerald-400', badge: 'bg-emerald-500/20 text-emerald-400', glowColor: '#10b981', pulse: false }
     case 'publiee':

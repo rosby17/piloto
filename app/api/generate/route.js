@@ -100,7 +100,7 @@ export async function POST(request) {
       body: JSON.stringify({
         video_inputs: videoInputs,
         dimension: { width: 1280, height: 720 },
-        title: titre || 'Piloto Video',
+        title: titre || 'Rogen Video',
       }),
     })
 

@@ -249,11 +249,11 @@ export default function MesVideos({ user, onNouvelleVideo }) {
                 ) : (
                   <button onClick={() => {
                     setOpenMenuId(null)
-                    sessionStorage.setItem('piloto_studio_video_id', v.id)
-                    sessionStorage.setItem('piloto_studio_script', v.script || v.contenu || '')
-                    sessionStorage.setItem('piloto_studio_title', v.titre || '')
-                    sessionStorage.setItem('piloto_studio_avatar_id', v.avatar_id || '')
-                    sessionStorage.setItem('piloto_studio_voice_id', v.voice_id || '')
+                    sessionStorage.setItem('rogen_studio_video_id', v.id)
+                    sessionStorage.setItem('rogen_studio_script', v.script || v.contenu || '')
+                    sessionStorage.setItem('rogen_studio_title', v.titre || '')
+                    sessionStorage.setItem('rogen_studio_avatar_id', v.avatar_id || '')
+                    sessionStorage.setItem('rogen_studio_voice_id', v.voice_id || '')
                     router.push('/dashboard/studio')
                   }} className="flex items-center gap-3 px-3.5 py-2.5 text-[12px] text-[#c0392b] hover:text-white hover:bg-[#1e1e1e] transition w-full text-left font-medium">
                     <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
@@ -360,11 +360,11 @@ export default function MesVideos({ user, onNouvelleVideo }) {
                       ) : (
                         <button onClick={e => {
                           e.stopPropagation()
-                          sessionStorage.setItem('piloto_studio_video_id', v.id)
-                          sessionStorage.setItem('piloto_studio_script', v.script || v.contenu || '')
-                          sessionStorage.setItem('piloto_studio_title', v.titre || '')
-                          sessionStorage.setItem('piloto_studio_avatar_id', v.avatar_id || '')
-                          sessionStorage.setItem('piloto_studio_voice_id', v.voice_id || '')
+                          sessionStorage.setItem('rogen_studio_video_id', v.id)
+                          sessionStorage.setItem('rogen_studio_script', v.script || v.contenu || '')
+                          sessionStorage.setItem('rogen_studio_title', v.titre || '')
+                          sessionStorage.setItem('rogen_studio_avatar_id', v.avatar_id || '')
+                          sessionStorage.setItem('rogen_studio_voice_id', v.voice_id || '')
                           router.push('/dashboard/studio')
                         }} className="w-7 h-7 rounded-lg bg-black/70 backdrop-blur-sm border border-white/10 flex items-center justify-center text-[#ccc] hover:text-white transition">
                           <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M8.5 1.5L10.5 3.5L4 10L1.5 10.5L2 8L8.5 1.5Z" stroke="currentColor" strokeWidth="1.2" strokeLinejoin="round"/></svg>
