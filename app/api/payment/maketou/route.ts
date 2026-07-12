@@ -26,9 +26,12 @@ export async function POST(req: Request) {
     // L'identifiant public du produit "Prix libre" sur Maketou
     const productDocumentId = '84c8e311-2291-4b84-af3e-07d8958fdce9';
 
+    // Conversion Euro -> Francs CFA (1 EUR = ~655 FCFA)
+    const amountInFCFA = amount * 655;
+
     const payload = {
       productDocumentId,
-      customerPrice: amount, // Prix libre dynamique
+      customerPrice: amountInFCFA, // Prix envoyé en FCFA à Maketou
       email: user.email,
       firstName: user.user_metadata?.full_name?.split(' ')[0] || 'Client',
       lastName: user.user_metadata?.full_name?.split(' ')[1] || 'Rogen',
