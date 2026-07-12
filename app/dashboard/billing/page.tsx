@@ -99,8 +99,12 @@ export default function BillingPage() {
               <li className="flex items-start gap-3 text-sm text-gray-200"><Check className="w-5 h-5 text-indigo-400 shrink-0" /> Export 4K sans filigrane</li>
               <li className="flex items-start gap-3 text-sm text-gray-200"><Check className="w-5 h-5 text-indigo-400 shrink-0" /> Clonage vocal premium</li>
             </ul>
-            <button className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-all shadow-lg flex items-center justify-center gap-2">
-              S'abonner <ArrowRight className="w-4 h-4" />
+            <button 
+              onClick={() => handlePayment(29, 100)}
+              disabled={loadingId === 29}
+              className="w-full py-3 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white font-semibold transition-all shadow-lg flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loadingId === 29 ? <Loader2 className="w-5 h-5 animate-spin" /> : <>S'abonner <ArrowRight className="w-4 h-4" /></>}
             </button>
           </div>
 
@@ -117,8 +121,12 @@ export default function BillingPage() {
               <li className="flex items-start gap-3 text-sm text-gray-300"><Check className="w-5 h-5 text-emerald-500 shrink-0" /> Toutes les features Pro</li>
               <li className="flex items-start gap-3 text-sm text-gray-300"><Check className="w-5 h-5 text-emerald-500 shrink-0" /> Support Prioritaire 24/7</li>
             </ul>
-            <button className="w-full py-3 rounded-xl bg-white text-black hover:bg-gray-200 font-semibold transition-colors">
-              S'abonner
+            <button 
+              onClick={() => handlePayment(99, 500)}
+              disabled={loadingId === 99}
+              className="w-full py-3 rounded-xl bg-white text-black hover:bg-gray-200 font-semibold transition-colors disabled:opacity-50 flex items-center justify-center"
+            >
+              {loadingId === 99 ? <Loader2 className="w-5 h-5 animate-spin" /> : "S'abonner"}
             </button>
           </div>
         </div>
