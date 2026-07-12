@@ -26,6 +26,9 @@ export async function POST(req: Request) {
     // L'identifiant public du produit "Prix libre" sur Maketou
     const productDocumentId = '84c8e311-2291-4b84-af3e-07d8958fdce9';
 
+    // Obtenir le domaine actuel dynamiquement (ex: https://piloto.tools-cl.com)
+    const origin = req.headers.get('origin') || 'https://piloto.tools-cl.com';
+
     // Conversion Euro -> Francs CFA (1 EUR = ~655 FCFA)
     const amountInFCFA = amount * 655;
 
@@ -35,7 +38,7 @@ export async function POST(req: Request) {
       email: user.email,
       firstName: user.user_metadata?.full_name?.split(' ')[0] || 'Client',
       lastName: user.user_metadata?.full_name?.split(' ')[1] || 'Rogen',
-      redirectURL: `https://piloto-teal.vercel.app/dashboard`,
+      redirectURL: `${origin}/dashboard`,
       meta: {
         userId: user.id,
         creditsToAdd
